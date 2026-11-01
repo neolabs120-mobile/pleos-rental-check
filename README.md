@@ -11,11 +11,22 @@
 
 차량 SDK는 Kotlin 앱에서 호출합니다. Flutter가 차량 SDK를 직접 호출하지 않습니다. 좌석 원시값 1은 비점유, 2는 점유이며 알 수 없는 값은 확인 불가입니다. 사람과 짐은 구분하지 못합니다.
 
-## APK
+## 시연 영상과 Release APK
 
-Releases의 v0.2.6에서 검증된 차량 Debug 체험 APK를 받습니다. 일반 Android 휴대폰만으로 Pleos 차량 SDK 전체를 시연할 수는 없습니다. 공식 Pleos 전용 AVD가 필요합니다. Flutter 휴대폰 APK는 이 릴리스에 포함하지 않으며 웹으로 시험했습니다.
+[![렌트체크 3분 시연](docs/demo-cover.png)](https://github.com/neolabs120-mobile/pleos-rental-check/releases/download/v0.2.6-submission/rentcheck_demo_0.2.6_3min.mp4)
 
-실제 AVD의 정상 SDK VIN 미수신 문제는 남아 있습니다. 알려진 Pleos ARM64 AVD의 Debug에서 사용자가 스위치를 켜고, 서버 opt-in과 테스트 예약을 함께 사용한 경우만 TEST0000000000001을 허용합니다. 다른 차량 신호는 실제 SDK에서 읽습니다. Release와 실제 차량 VIN 검증은 유지합니다.
+[0.2.6 제출 자료 릴리스](https://github.com/neolabs120-mobile/pleos-rental-check/releases/tag/v0.2.6-submission)에서 받습니다.
+
+- `rentcheck_vehicle_0.2.6_release.apk`: Kotlin/Compose 차량용, Android 9 이상, 실제 Pleos 환경과 정상 VIN 필요.
+- `rentcheck_mobile_0.2.6_release.apk`: Flutter 휴대폰용, Android 7 이상, 설정에서 HTTPS 서버 주소 입력.
+- `rentcheck_demo_0.2.6_3min.mp4`: 1920×1080·30fps·3분, 실제 AVD 화면·Flutter 웹 캡처와 이번 실제 Pleos 출력 음성.
+- `APK_SHA256.txt`: 배포 APK 지문. 두 APK 모두 Release 빌드·별도 배포 키 서명·debuggable=false입니다.
+
+시연 영상은 알려진 Pleos ARM64 AVD의 Debug에서 명시적으로 테스트 VIN을 켠 새 체험 예약으로 촬영했습니다. 실제 SDK 창문·좌석과 실제 TTS를 사용하며 생성 시험 사진·장면 편집을 표시했습니다. 로그인된 계정에서 시작하고, 웹 사진 선택·전송·직접 확인·최종 접수는 실제 브라우저로 진행했습니다. 차량 장면은 androidTest의 `SubmissionVideoFlowRunner`가 실제 MainActivity/ViewModel의 동일한 이벤트를 호출하며 예시 UI 상태를 주입하지 않습니다.
+
+이전 [v0.2.6 Debug 체험 APK](https://github.com/neolabs120-mobile/pleos-rental-check/releases/tag/v0.2.6)는 보존했습니다. 에뮬레이터의 정상 SDK VIN 미수신 문제는 남아 있으며 Release에는 테스트 VIN 대체가 없습니다. 두 Release APK의 설치·첫 실행은 확인했지만 정상 VIN을 사용하는 Release 전체 대여 흐름과 실폰 촬영은 미검증입니다. 휴대폰 Release는 HTTP를 허용하지 않으며 공개 운영 서버는 제공하지 않습니다. 서버를 별도로 준비해야 합니다. 기존 Debug와 Release의 서명이 다르므로 기존 Debug 데이터를 지우며 교체하지 말고 별도 시험 환경에서 설치합니다.
+
+[구성·검증·서명 절차](docs/RELEASE_SUBMISSION_0.2.6.md)
 
 ## 새 환경 실행
 
@@ -58,8 +69,8 @@ python server/issue_booking.py --base-url http://127.0.0.1:8788 --email 본인_�
 
 ## 검증
 
-0.2.6 Android Debug 82/Release 80, 빌드와 Lint 오류 0. 밝은 화면·음성 팝업·연결·620dp/큰 글자·야간 5조건을 확인했습니다. 최신 실제 체험에서 정상 계정 연결·인수·반납 저장 후 Flutter 웹 사진 3장·직접 확인 3종·최종 접수와 차량/웹/서버 번호 일치를 확인했습니다. TTS 10조건과 출력 오디오는 선행 0.2.5 실제 AVD 검증 근거입니다. 자세한 범위는 docs/VALIDATION.md를 따릅니다.
+0.2.6 Android Debug 82/Release 80, 빌드와 Lint 오류 0. 밝은 화면·음성 팝업·연결·620dp/큰 글자·야간 5조건을 확인했습니다. 최신 실제 체험에서 정상 계정 연결·인수·반납 저장 후 Flutter 웹 사진 3장·직접 확인 3종·최종 접수와 차량/웹/서버 번호 일치를 확인했습니다. TTS 10조건은 선행 0.2.5 검증 근거이며 이번 영상에서도 실제 한국어 안내 완료와 출력 PCM을 다시 확인했습니다. 자세한 범위는 docs/VALIDATION.md를 따릅니다.
 
-실차·정상 VIN 전체 통합·실폰 QR/촬영·iOS·제출용 Release 실행 경로는 추가 검증 대상입니다. 앱의 점검 접수는 실제 사업자의 반납·요금 정산과 별도입니다. 자동 손상·책임 판정과 원격 차량 제어는 제공하지 않습니다.
+Release APK 두 개의 설치·첫 실행은 확인했습니다. 실차·정상 VIN 전체 통합·실폰 QR/촬영·iOS는 추가 검증 대상입니다. 앱의 점검 접수는 실제 사업자의 반납·요금 정산과 별도입니다. 자동 손상·책임 판정과 원격 차량 제어는 제공하지 않습니다.
 
 자동 통합 스크립트는 경로 인자를 지정해 사용합니다. macOS 기본 adb 경로는 현재 사용자 홈을 기준으로 하고 Flutter는 PATH에서 찾습니다. 본체 소스는 그대로이며 호스트 시험 스크립트의 도구 기본 경로만 배포 환경에 맞췄습니다.
