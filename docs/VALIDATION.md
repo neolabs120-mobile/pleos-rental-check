@@ -1,5 +1,9 @@
 # 최신 제출 자료 검증 · 2026-11-02
 
+## 차량 UI 0.2.9
+
+Debug86/Release84·빌드·Lint오류0/기존경고24, 별도 AVD 예시 화면10조건을 통과했습니다. 현재 예약·설정39개·기존 업무 행을 보존하고 실제 정상 MainActivity의 새 UI·거리·버튼을 확인했습니다. 같은 키 Release 설치/첫 실행·테스트VIN제외를 확인했습니다. Flutter/서버는0.2.8 유지이며 새 SDK/음성/사진/최종 제출 전체 재시험은 아닙니다. [상세](NATIVE_UI_0.2.9.md)
+
 ## 차량·Flutter 0.2.8 · 반납 장소 안내
 
 Android Debug 86/Release 84·서버 42·Flutter 42(선택 2개 제외), 정적 분석·빌드·Lint 오류 0/경고 24. 분리된 읽기 전용 AVD에서 실제 프로덕션 컨트롤러·Compose·Vehicle/FusedLocation/NaviHelper로 11조건과 반납 점검 저장을 통과했습니다. 실제 웹에서 예약 장소·시험 표시·기록·반납 사진 진입, 같은 키로 서명한 두 Release의 설치/첫 실행을 확인했습니다. 원본 AVD는 꺼진 상태로 보존했고 기존 업무 DB 행·사진 정책·키·APK·영상은 유지했습니다. 시험 장소·모의 GPS·Debug 테스트 VIN이며 실차·정상 VIN 전체 통합은 미검증입니다. [범위·결과](RETURN_LOCATION_0.2.8.md), [현재 API 활용](PLEOS_API_USAGE_0.2.8.md)

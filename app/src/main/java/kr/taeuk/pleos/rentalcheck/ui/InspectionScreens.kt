@@ -13,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -33,6 +34,7 @@ fun RentalCheckScreen(state: InspectionUiState, onEvent: (InspectionEvent) -> Un
     var expandedResult by rememberSaveable(state.record?.id) { mutableStateOf(false) }
     var confirmReplace by rememberSaveable { mutableStateOf(false) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    var extrasExpanded by rememberSaveable { mutableStateOf(false) }
     val snapshot = if (state.stage in listOf(InspectionStage.EVIDENCE, InspectionStage.RESULT)) state.record?.returned else state.current
     val canGoBack = state.stage == InspectionStage.RETURN ||
         (state.stage in listOf(InspectionStage.CONNECT, InspectionStage.PICKUP) && state.record != null)
@@ -60,7 +62,7 @@ fun RentalCheckScreen(state: InspectionUiState, onEvent: (InspectionEvent) -> Un
     ) { insets ->
         BoxWithConstraints(Modifier.fillMaxSize().padding(insets)) {
             val wide = maxWidth >= 840.dp
-            val dashboard = maxWidth >= 1250.dp && state.stage == InspectionStage.ACTIVE
+            val dashboard = maxWidth >= 1080.dp && LocalDensity.current.fontScale <= 1.3f && state.stage == InspectionStage.ACTIVE
             val seats: @Composable () -> Unit = {
                 SeatOccupancyCard(if (state.record?.returned != null) SeatOccupancy.readings(state.record.returned)
                     else state.assistance.seatReadings.ifEmpty { SeatOccupancy.readings(snapshot) }, state.record?.returned != null)
@@ -74,7 +76,7 @@ fun RentalCheckScreen(state: InspectionUiState, onEvent: (InspectionEvent) -> Un
             LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(if (wide) 20.dp else 16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 item("title") { ContentWidth { ScreenHeading(state) } }
-                if (state.stage in listOf(InspectionStage.ACTIVE, InspectionStage.RETURN)) item("return-location") {
+                if (state.stage == InspectionStage.RETURN) item("return-location") {
                     ContentWidth { ReturnLocationCard(state, onEvent) }
                 }
                 if (state.stage in listOf(InspectionStage.CONNECT, InspectionStage.PICKUP)) item("practice") {
@@ -98,12 +100,15 @@ fun RentalCheckScreen(state: InspectionUiState, onEvent: (InspectionEvent) -> Un
                                 EnergyCard(snapshot, onClick = { openDetail(DetailGroup.ENERGY) })
                                 WarningCard(snapshot, null, openDetail)
                             }, right = { VehicleCard(snapshot, state.windowManuallyChecked, openDetail) })
-                        InspectionStage.ACTIVE -> if (dashboard) Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                            Column(Modifier.weight(1.25f), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                                ActiveContent(state, true, openDetail); memory()
+                        InspectionStage.ACTIVE -> if (dashboard) Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                            Column(Modifier.weight(1.45f), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                                ReturnLocationCard(state, onEvent)
+                                TripSummaryCard(state) { openDetail(DetailGroup.ALL) }
                             }
-                            Box(Modifier.weight(1f)) { seats() }
-                        } else ActiveContent(state, wide, openDetail)
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(20.dp)) { seats(); memory() }
+                        } else Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                            ReturnLocationCard(state, onEvent); TripSummaryCard(state) { openDetail(DetailGroup.ALL) }; seats(); memory()
+                        }
                         InspectionStage.RETURN -> TwoColumns(wide,
                             left = {
                                 AttentionCard(state, snapshot, openDetail)
@@ -113,19 +118,22 @@ fun RentalCheckScreen(state: InspectionUiState, onEvent: (InspectionEvent) -> Un
                         InspectionStage.EVIDENCE -> EvidenceContent(state, wide, onEvent)
                     }
                 } }
-                if (!dashboard) item("seat-occupancy") { ContentWidth { seats() } }
-                if (!dashboard) item("luggage-memory") { ContentWidth {
+                if (state.stage != InspectionStage.ACTIVE) item("seat-occupancy") { ContentWidth { seats() } }
+                if (state.stage != InspectionStage.ACTIVE) item("luggage-memory") { ContentWidth {
                     if (state.stage == InspectionStage.ACTIVE) TwoColumns(wide, left = { memory() },
                         right = { FamiliarizationCard(state, onEvent) }) else memory()
                 } }
                 item("platform") { ContentWidth {
-                    if (dashboard) TwoColumns(true, left = { FamiliarizationCard(state, onEvent) },
-                        right = { CloudStatusCard(state, onEvent, onSettings = { showSettings = true }) })
-                    else CloudStatusCard(state, onEvent, onSettings = { showSettings = true })
-                } }
-                if (state.stage == InspectionStage.ACTIVE) item("pickup-photos") { ContentWidth {
-                    PhotoLinkCard(state.photoLink?.takeIf { it.phase == "pickup" }, state.cloudBusy,
-                        title = "인수 사진 첨부 (선택)", onCreate = { onEvent(InspectionEvent.CreatePhotoLink("pickup")) })
+                    if (state.stage == InspectionStage.ACTIVE) {
+                        OutlinedButton(onClick = { extrasExpanded = !extrasExpanded }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                            shape = RoundedCornerShape(14.dp)) { Text(if (extrasExpanded) "사진 · 차량 연습 · 전송 상태 접기  −" else "사진 · 차량 연습 · 전송 상태  ＋") }
+                        if (extrasExpanded) Column(Modifier.padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                            TwoColumns(wide, left = { FamiliarizationCard(state, onEvent) },
+                                right = { CloudStatusCard(state, onEvent, onSettings = { showSettings = true }) })
+                            PhotoLinkCard(state.photoLink?.takeIf { it.phase == "pickup" }, state.cloudBusy,
+                                title = "인수 사진 첨부 (선택)", onCreate = { onEvent(InspectionEvent.CreatePhotoLink("pickup")) })
+                        }
+                    } else CloudStatusCard(state, onEvent, onSettings = { showSettings = true })
                 } }
                 item("secondary") { ContentWidth {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
@@ -189,8 +197,8 @@ private fun AppHeader(state: InspectionUiState, onEvent: (InspectionEvent) -> Un
                         RentalBrand()
                         if (!compact) {
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                Text("정차 후 이용해 주세요", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                state.pairedBooking?.let { Text("${it.nickname}님 · 예약 ${it.number}", style = MaterialTheme.typography.labelSmall) }
+                                Text("차량 연결 · 정차 후 이용", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                state.pairedBooking?.let { Text("예약 ${it.number}", style = MaterialTheme.typography.bodySmall) }
                             }
                             actions()
                         }
@@ -198,20 +206,7 @@ private fun AppHeader(state: InspectionUiState, onEvent: (InspectionEvent) -> Un
                     if (compact) actions()
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                InspectionStage.entries.forEachIndexed { index, stage ->
-                    val selected = stage == state.stage
-                    Surface(Modifier.weight(1f), shape = RoundedCornerShape(12.dp),
-                        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .5f)) {
-                        Row(Modifier.padding(horizontal = 10.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text("${index + 1}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                            Text(stage.title, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                                color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-            }
+            JourneyProgress(state.stage)
             if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         }
     }
@@ -223,18 +218,14 @@ private fun ScreenHeading(state: InspectionUiState) {
     val (title, description) = when (state.stage) {
         InspectionStage.CONNECT -> "먼저 차량 연결을 확인해 주세요" to "이 화면이 실행 중인 차량에서 점검 정보를 읽을 수 있는지 확인해요."
         InspectionStage.PICKUP -> "인수할 차량을 확인하세요" to "출발 전 상태를 저장해 반납할 때 비교해요."
-        InspectionStage.ACTIVE -> "차량 이용 중이에요" to "인수 기록은 저장됐어요. 반납 전 상태를 다시 확인해요."
+        InspectionStage.ACTIVE -> "이용 현황" to "반납 장소와 소지품 메모를 한곳에서 확인하세요."
         InspectionStage.RETURN -> "반납 전, 달라진 점을 확인하세요" to "인수 때와의 변화와 확인이 필요한 항목을 살펴보세요."
         InspectionStage.EVIDENCE -> "사진과 직접 확인 내역을 보내 주세요" to "휴대전화에서 창문·소지품·외관 사진을 첨부하고 확인 내용을 전송해요."
         InspectionStage.RESULT -> "점검 기록을 서버에 제출했어요" to "인수 ${inspectionTime(state.record?.pickup?.completedAtMillis ?: 0)} → 반납 점검 ${inspectionTime(state.record?.returned?.completedAtMillis ?: 0)}"
     }
-    Surface(shape = RoundedCornerShape(22.dp), color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = .6f)) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-            Text("${state.stage.ordinal + 1} / ${InspectionStage.entries.size} 단계 · ${state.stage.title}", style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary)
-            Text(title, style = MaterialTheme.typography.headlineSmall)
-            Text(description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+    Column(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(title, style = MaterialTheme.typography.headlineSmall)
+        Text(description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -257,7 +248,7 @@ private fun ActionBar(state: InspectionUiState, expanded: Boolean, onPrimary: ()
         InspectionStage.CONNECT, InspectionStage.ACTIVE, InspectionStage.RESULT -> true
         else -> canSave
     }
-    Surface(shadowElevation = 3.dp) {
+    Surface(shadowElevation = 1.dp) {
         BoxWithConstraints(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp)) {
             val wide = maxWidth >= 800.dp
             val actions: @Composable () -> Unit = {
@@ -276,13 +267,13 @@ private fun ActionBar(state: InspectionUiState, expanded: Boolean, onPrimary: ()
                     Text(when (state.stage) {
                         InspectionStage.CONNECT -> "차량 VIN을 받은 뒤 다음 단계로 진행할 수 있어요."
                         InspectionStage.PICKUP -> "기기에 임시 보관한 뒤 서버로 전송해요."
-                        InspectionStage.ACTIVE -> "정차한 뒤 반납 점검을 진행해 주세요."
+                        InspectionStage.ACTIVE -> "주차 후 반납 점검을 시작하세요."
                         InspectionStage.RETURN -> "차량 상태를 새로 읽은 뒤 사진 첨부로 진행해요."
                         InspectionStage.EVIDENCE -> "각 항목 사진 1장과 직접 확인 내역이 필요해요."
-                        InspectionStage.RESULT -> "렌터카 업체의 반납 처리는 별도로 진행해요."
+                        InspectionStage.RESULT -> "사업자의 반납 처리는 별도로 진행해요."
                     }, style = MaterialTheme.typography.bodySmall)
                     val saved = if (state.stage in listOf(InspectionStage.EVIDENCE, InspectionStage.RESULT)) state.record?.returned else state.current
-                    saved?.let { Muted("수집 ${inspectionTime(it.completedAtMillis)}") }
+                    if (state.stage != InspectionStage.ACTIVE) saved?.let { Muted("수집 ${inspectionTime(it.completedAtMillis)}") }
                 }
             }
             if (wide) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(24.dp)) {
@@ -470,33 +461,6 @@ private fun CarSilhouette() {
     }
 }
 
-// Keep stored pickup and current-trip metrics adjacent so wide displays can show the seat map beside both without hiding the primary action.
-@Composable
-private fun ActiveContent(state: InspectionUiState, wide: Boolean, open: (DetailGroup) -> Unit) {
-    val record = state.record ?: return
-    val report = state.current?.takeIf { it != record.pickup }?.let { SnapshotComparison.compare(record.pickup, it) }
-    TwoColumns(wide, left = {
-        Panel {
-            PanelTitle("저장된 인수 기록", inspectionTime(record.pickup.completedAtMillis))
-            energyReadings(record.pickup).forEach { SmallComparison(it.label, valueText(it)) }
-            SmallComparison("누적 주행거리", valueText(record.pickup.find("odometer.km")))
-            SmallComparison("창문 직접 확인", if (record.pickupWindowManuallyChecked) "확인 완료" else "미기록")
-            Muted("반납할 때 이 기록을 기준으로 비교해요.")
-        }
-    }, right = {
-        Panel {
-            PanelTitle("이번 이용 요약")
-            Metric("인수 이후 주행거리", report?.distanceKm?.let { displayNumber(it) + " km" }
-                ?: if (state.current == record.pickup) "다음 조회 후 확인" else "비교 불가")
-            report?.distanceProblem?.let { Muted(it) }
-            Spacer(Modifier.height(16.dp))
-            energyReadings(state.current).forEach { SmallComparison("최근 ${it.label}", valueText(it)) }
-            state.current?.let { Muted("최근 수집 ${inspectionTime(it.completedAtMillis)}") }
-            TextButton(onClick = { open(DetailGroup.ENERGY) }, contentPadding = PaddingValues(0.dp)) { Text("최근 차량 정보  ›") }
-        }
-    })
-}
-
 @Composable
 private fun AttentionCard(state: InspectionUiState, snapshot: VehicleSnapshot?, open: (DetailGroup) -> Unit) {
     Panel {
@@ -584,7 +548,13 @@ private fun ReadingDetails(group: DetailGroup, snapshot: VehicleSnapshot?, state
                     Text("창문을 직접 확인했어요", style = MaterialTheme.typography.bodyLarge)
                 } else Muted("직접 확인 여부는 저장된 기록에서 확인할 수 있어요.")
             }
-            if (group == DetailGroup.ALL) Muted(state.message)
+            if (group == DetailGroup.ALL) {
+                Muted(state.message)
+                state.record?.let { record ->
+                    SmallComparison("인수 기록 저장", inspectionTime(record.pickup.completedAtMillis))
+                    SmallComparison("인수 시 창문 직접 확인", if (record.pickupWindowManuallyChecked) "확인 완료" else "미기록")
+                }
+            }
         }
         val readings = group.readings(snapshot)
         if (readings.isEmpty()) item { Notice("수집된 정보가 없어요", "차량에 연결한 뒤 다시 확인해 주세요.") }
@@ -621,9 +591,9 @@ internal fun TwoColumns(wide: Boolean, left: @Composable ColumnScope.() -> Unit,
 // Group related readings with a quiet border and restrained padding so the limited automotive app area carries useful information.
 @Composable
 internal fun Panel(content: @Composable ColumnScope.() -> Unit) {
-    Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), color = MaterialTheme.colorScheme.surface,
+    Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .7f))) {
-        Column(Modifier.padding(20.dp), content = content)
+        Column(Modifier.padding(24.dp), content = content)
     }
 }
 

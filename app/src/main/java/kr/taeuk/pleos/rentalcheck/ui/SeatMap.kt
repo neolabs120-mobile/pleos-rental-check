@@ -30,7 +30,7 @@ internal fun SeatMap(readings: List<VehicleReading>) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Text("차량 앞쪽 ↑", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         listOf(areas.take(2), areas.drop(2)).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 row.forEach { (area, label) ->
                     Box(Modifier.weight(1f)) { values[area]?.let { SeatTile(label, it) } }
                 }
@@ -53,11 +53,11 @@ private fun SeatTile(label: String, reading: VehicleReading) {
     Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), color = fill,
         border = BorderStroke(1.dp, if (occupied == true) colors.error.copy(alpha = .4f) else colors.outlineVariant)) {
         Column(Modifier.padding(horizontal = 10.dp, vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SeatGlyph(ink)
             Text(label, style = MaterialTheme.typography.labelMedium, color = ink)
             Text(when (occupied) { true -> "점유"; false -> "비점유"; null -> valueText(reading) },
-                style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = ink)
+                style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = ink)
         }
     }
 }

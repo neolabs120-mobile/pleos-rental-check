@@ -12,8 +12,8 @@ import androidx.compose.ui.unit.dp
 // Keep the simulated identity visible on every vehicle screen so test receipts can never be mistaken for a real VIN observation.
 @Composable
 fun EmulatorTestBanner() {
-    Surface(color = MaterialTheme.colorScheme.tertiaryContainer, modifier = Modifier.fillMaxWidth()) {
-        Text("에뮬레이터 테스트 VIN 사용 중 · 실제 차량 VIN 아님 · 나머지 항목은 SDK 조회", Modifier.padding(12.dp),
-            style = MaterialTheme.typography.labelLarge)
+    Surface(color = MaterialTheme.colorScheme.errorContainer, modifier = Modifier.fillMaxWidth()) {
+        Text("에뮬레이터 시험 모드 · 테스트 VIN 사용 · 실제 차량 VIN이 아닙니다", Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+            style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onErrorContainer)
     }
 }

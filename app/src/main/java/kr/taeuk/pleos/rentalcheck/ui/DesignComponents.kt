@@ -14,6 +14,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalDensity
+import kr.taeuk.pleos.rentalcheck.InspectionStage
 
 // Give the native app a small, code-drawn vehicle mark without adding an image dependency or presenting a simulated vehicle state.
 @Composable
@@ -31,6 +33,33 @@ internal fun RentalBrand() {
             }
         }
         Text("렌트체크", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+    }
+}
+
+// Keep stage names readable at large text sizes: compact displays show the exact current step instead of squeezing six labels into clipped cells.
+@Composable
+internal fun JourneyProgress(current: InspectionStage) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        if (maxWidth < 860.dp || LocalDensity.current.fontScale > 1.2f) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                StateBadge("${current.ordinal + 1} / 6 · ${current.title}")
+                Text("계정 연결부터 반납 기록까지", style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+            }
+        } else Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            InspectionStage.entries.forEachIndexed { index, stage ->
+                val selected = stage == current
+                Surface(Modifier.weight(1f), shape = RoundedCornerShape(10.dp),
+                    color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow) {
+                    Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("0${index + 1}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                        Text(stage.title, style = MaterialTheme.typography.labelMedium,
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                            color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
     }
 }
 

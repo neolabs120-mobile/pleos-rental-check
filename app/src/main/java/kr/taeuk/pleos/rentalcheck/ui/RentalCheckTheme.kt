@@ -10,6 +10,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -19,7 +21,7 @@ private val lightColors = lightColorScheme(
     primaryContainer = Color(0xFFDDF2EC), onPrimaryContainer = Color(0xFF064C44),
     secondary = Color(0xFF49665D), onSecondary = Color.White,
     secondaryContainer = Color(0xFFDDF2EC), onSecondaryContainer = Color(0xFF064C44),
-    background = Color(0xFFF2F5F4), surface = Color.White,
+    background = Color(0xFFF1F5F3), surface = Color.White,
     surfaceContainerLow = Color(0xFFF7FAF8), surfaceContainer = Color(0xFFF0F5F2),
     surfaceContainerHigh = Color(0xFFF7FAF8), surfaceContainerHighest = Color(0xFFE1EBE5),
     surfaceVariant = Color(0xFFEBF0ED), onSurface = Color(0xFF182F2C), onBackground = Color(0xFF182F2C),
@@ -31,24 +33,27 @@ private val darkColors = darkColorScheme(
     primaryContainer = Color(0xFF193D37), onPrimaryContainer = Color(0xFFB8F3E4),
     secondary = Color(0xFFB5CEC3), onSecondary = Color(0xFF102D29),
     secondaryContainer = Color(0xFF28473D), onSecondaryContainer = Color(0xFFCEEBDE),
-    background = Color(0xFF171E24), surface = Color(0xFF202A32), surfaceVariant = Color(0xFF2C3943),
+    background = Color(0xFF11221F), surface = Color(0xFF192D28), surfaceVariant = Color(0xFF263C35),
     surfaceContainerLow = Color(0xFF202A32), surfaceContainer = Color(0xFF253139),
     surfaceContainerHigh = Color(0xFF29363D), surfaceContainerHighest = Color(0xFF304148),
     onSurface = Color(0xFFEDF4F7), onBackground = Color(0xFFEDF4F7), onSurfaceVariant = Color(0xFFB2C4CE),
     outlineVariant = Color(0xFF40515D), error = Color(0xFFFFD194),
     errorContainer = Color(0xFF3A2D1E), onErrorContainer = Color(0xFFFFD194),
 )
+// Use one font family and predictable baselines for Korean copy, metrics and buttons instead of inheriting unrelated Material defaults.
+private fun vehicleText(size: Int, height: Int, weight: FontWeight = FontWeight.Normal) = TextStyle(
+    fontFamily = FontFamily.SansSerif, fontSize = size.sp, lineHeight = height.sp, fontWeight = weight,
+    platformStyle = PlatformTextStyle(includeFontPadding = false))
+
 private val vehicleType = Typography(
-    headlineSmall = TextStyle(fontSize = 30.sp, lineHeight = 38.sp, fontWeight = FontWeight.Bold),
-    titleLarge = TextStyle(fontSize = 24.sp, lineHeight = 32.sp, fontWeight = FontWeight.Bold),
-    titleMedium = TextStyle(fontSize = 20.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold),
-    titleSmall = TextStyle(fontSize = 16.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold),
-    bodyLarge = TextStyle(fontSize = 20.sp, lineHeight = 30.sp),
-    bodyMedium = TextStyle(fontSize = 18.sp, lineHeight = 26.sp),
-    bodySmall = TextStyle(fontSize = 15.sp, lineHeight = 22.sp),
-    labelLarge = TextStyle(fontSize = 16.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold),
-    labelMedium = TextStyle(fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.Medium),
-    labelSmall = TextStyle(fontSize = 14.sp, lineHeight = 20.sp),
+    displaySmall = vehicleText(42, 50, FontWeight.SemiBold),
+    headlineSmall = vehicleText(32, 40, FontWeight.SemiBold),
+    titleLarge = vehicleText(26, 34, FontWeight.SemiBold),
+    titleMedium = vehicleText(22, 30, FontWeight.SemiBold),
+    titleSmall = vehicleText(18, 26, FontWeight.Medium),
+    bodyLarge = vehicleText(20, 30), bodyMedium = vehicleText(20, 30), bodySmall = vehicleText(18, 28),
+    labelLarge = vehicleText(18, 24, FontWeight.SemiBold),
+    labelMedium = vehicleText(16, 24, FontWeight.Medium), labelSmall = vehicleText(16, 24),
 )
 
 // Give every vehicle screen the same readable type scale, restrained surfaces and rounded controls while honoring system night mode.

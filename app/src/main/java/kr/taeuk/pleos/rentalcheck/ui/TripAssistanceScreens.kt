@@ -17,21 +17,15 @@ import kotlinx.coroutines.delay
 @Composable
 internal fun SeatOccupancyCard(readings: List<VehicleReading>, saved: Boolean) {
     Panel {
-        BoxWithConstraints {
-            val explanation: @Composable () -> Unit = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    PanelTitle("좌석 점유 신호")
-                    val occupied = readings.count { it.available && it.value == "true" && it.displayValue == "점유" }
-                    StateBadge(if (occupied > 0) "점유 신호 ${occupied}곳" else "각 공간을 직접 확인해 주세요", occupied > 0)
-                    Text("좌석과 발밑의 소지품을 한 번 더 살펴보세요.")
-                    Muted("사람과 짐은 구분하지 않아요. 비점유여도 작은 물건과 다른 공간은 직접 확인해 주세요.")
-                    val at = readings.maxOfOrNull { it.observedAtMillis } ?: 0
-                    if (at > 0) Muted((if (saved) "반납 저장 시점 · " else "최근 수신 · ") + inspectionTime(at))
-                }
-            }
-            if (maxWidth >= 760.dp) Row(horizontalArrangement = Arrangement.spacedBy(32.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.weight(.9f)) { explanation() }; Box(Modifier.weight(1f)) { SeatMap(readings) }
-            } else Column(verticalArrangement = Arrangement.spacedBy(18.dp)) { explanation(); SeatMap(readings) }
+        PanelTitle("소지품 확인", "좌석 점유 신호")
+        val occupied = readings.count { it.available && it.value == "true" && it.displayValue == "점유" }
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            StateBadge(if (occupied > 0) "점유 신호 ${occupied}곳 · 좌석과 발밑 확인" else "좌석과 발밑을 직접 확인하세요", occupied > 0)
+            SeatMap(readings)
+            Text("사람과 짐은 구분하지 못해요. 비점유 좌석과 트렁크도 직접 살펴보세요.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            val at = readings.maxOfOrNull { it.observedAtMillis } ?: 0
+            if (at > 0) Muted((if (saved) "반납 저장 시점 · " else "최근 수신 · ") + inspectionTime(at))
         }
     }
 }
@@ -54,18 +48,32 @@ internal fun FamiliarizationCard(state: InspectionUiState, onEvent: (InspectionE
 @Composable
 internal fun UsageMemoryCard(memory: UsageMemory, onMark: ((StorageSpace, Boolean) -> Unit)? = null, problem: String? = null) {
     Panel {
-        PanelTitle(if (onMark == null) "내리기 전, 사용한 공간 다시 확인" else "짐을 둔 곳 기억하기")
-        if (memory.openedSpaces.isNotEmpty()) Text("앱이 열림을 관측한 곳: " + StorageSpace.entries.filter { it in memory.openedSpaces }.joinToString { it.label })
-        else Muted("관측한 문·트렁크 열림이 아직 없어요. 사용하지 않았다는 뜻은 아니에요.")
-        if (memory.markedSpaces.isNotEmpty()) Text("내가 짐을 뒀다고 표시한 곳: " + StorageSpace.entries.filter { it in memory.markedSpaces }.joinToString { it.label })
-        if (onMark != null) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            StorageSpace.entries.forEach { space -> FilterChip(selected = space in memory.markedSpaces,
-                onClick = { onMark(space, space !in memory.markedSpaces) }, label = { Text(space.label) }) }
+        PanelTitle(if (onMark == null) "사용한 공간 다시 확인" else "짐을 둔 곳", if (onMark != null) "직접 표시" else "저장된 메모")
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (onMark != null) {
+                Text("짐을 둔 공간을 표시해 두면 반납할 때 다시 보여드려요.", style = MaterialTheme.typography.bodySmall)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    StorageSpace.entries.forEach { space -> FilterChip(selected = space in memory.markedSpaces,
+                        onClick = { onMark(space, space !in memory.markedSpaces) }, modifier = Modifier.heightIn(min = 48.dp),
+                        label = { Text(storageLabel(space), style = MaterialTheme.typography.labelMedium) }) }
+                }
+            } else Text(if (memory.markedSpaces.isEmpty()) "직접 표시한 짐 메모가 없어요. 사용한 공간을 직접 확인하세요."
+                else "직접 표시 · " + memory.markedSpaces.joinToString { storageLabel(it) }, style = MaterialTheme.typography.bodyMedium)
+            Muted(if (memory.openedSpaces.isEmpty()) "열림 관측 기록이 없어요. 사용하지 않았다는 뜻은 아니에요."
+                else "문·트렁크 열림 관측 · " + memory.openedSpaces.joinToString { storageLabel(it) })
+            Muted("물건의 유무는 판단하지 않아요. 화면이 꺼진 동안의 동작은 놓칠 수 있어요.")
+            problem?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         }
-        Muted(if (onMark != null) "이용 건별로 기기에 보관하고 반납 기록 저장 때 서버로 전송해요. 화면이 꺼진 동안의 동작은 놓칠 수 있어요."
-            else "문을 열었다는 이유로 소지품이 남았다고 판단하지 않아요. 표시된 곳 외에도 직접 확인해 주세요.")
-        problem?.let { Text(it, color = MaterialTheme.colorScheme.error) }
     }
+}
+
+// Shorten only display labels so the same stored location identifiers and mark/unmark events remain intact on compact cards.
+private fun storageLabel(space: StorageSpace) = when (space) {
+    StorageSpace.FRONT_LEFT -> "운전석"
+    StorageSpace.FRONT_RIGHT -> "동승석"
+    StorageSpace.REAR_LEFT -> "뒤 왼쪽"
+    StorageSpace.REAR_RIGHT -> "뒤 오른쪽"
+    StorageSpace.TRUNK -> "트렁크"
 }
 
 // Guide a real closed→open→closed sequence with a bounded timer; SDK failures, an expired timer or a non-P gear never count as completion.

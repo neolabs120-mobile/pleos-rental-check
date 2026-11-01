@@ -12,8 +12,8 @@ android {
         applicationId = "kr.taeuk.pleos.rentalcheck"
         minSdk = 28
         targetSdk = 35
-        versionCode = 12
-        versionName = "0.2.8"
+        versionCode = 13
+        versionName = "0.2.9"
         // Select an explicit integration runner for test APKs without adding an automation entry point to the production app.
         testInstrumentationRunner = providers.gradleProperty("rentalInstrumentationRunner")
             .getOrElse("kr.taeuk.pleos.rentalcheck.TripAssistanceFlowRunner")

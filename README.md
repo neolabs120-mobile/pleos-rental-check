@@ -1,8 +1,14 @@
 # 렌트체크
 
+## 차량 0.2.9 · 정돈한 차량 화면
+
+글꼴·크기·카드 간격을 통일했습니다. 왼쪽 반납 장소·직선거리·이용 요약, 오른쪽 좌석·짐 메모 순서로 확인합니다. 사진·차량 연습·전송은 보조 영역에서 열며 하단 반납 버튼은 고정합니다. 큰 글자·야간·긴 장소명 등 실제 네이티브 표시10조건과 Debug86/Release84·빌드·Lint오류0, 같은 키 Release 설치를 확인했습니다. 진행 예약·설정39개·기존 DB행을 보존했습니다. [상세 변경·검증·APK](docs/NATIVE_UI_0.2.9.md)
+
+차량은 **0.2.9+13**, Flutter·서버는 **0.2.8**입니다. 이전 위치/내비 통합과 사진·음성 전체 근거를 이번 UI 표시 검토와 구분합니다. 기존 영상은0.2.6을 유지하고 새 영상은 최종 게시 요청 때 올립니다.
+
 처음 카셰어링을 이용하는 사람의 계정 연결·인수·이용·반납 점검을 돕습니다. 차량 신호를 좌석 위치 안내와 한국어 음성으로 연결하고 사진·직접 확인·접수 기록을 보관합니다.
 
-## 차량·Flutter 0.2.8 · 반납 장소 안내
+## 이전 0.2.8 · 반납 장소 안내
 
 예약별 반납 장소, Pleos FusedLocation의 새 차량 위치 직선거리, P에서 확인하는 NaviHelper 길 안내를 추가했습니다. 실제 목적지·안내 상태를 확인하며 가까워져도 자동 반납하지 않습니다. 위치 권한 거부·오래된 값은 확인 불가로 표시하고 현재 차량 좌표는 서버에 보내지 않습니다. [구현·11조건 실제 SDK 시험·예약 발급·빌드](docs/RETURN_LOCATION_0.2.8.md)
 
@@ -16,7 +22,7 @@
 
 ## 구성
 
-- app: Kotlin/Compose 차량 앱 0.2.8. Vehicle 2.3.2, vehicle-aidl 1.1.1, TextToSpeech 3.3.1, FusedLocation 1.1.3, NaviHelper 3.0.5.
+- app: Kotlin/Compose 차량 앱 0.2.9. Vehicle 2.3.2, vehicle-aidl 1.1.1, TextToSpeech 3.3.1, FusedLocation 1.1.3, NaviHelper 3.0.5.
 - mobile: Flutter 이용자 앱과 웹 0.2.8. 계정, 예약, QR 승인, 사진, 직접 확인, 접수.
 - server: FastAPI 서버와 사진·계정 처리. requirements-lock.txt 포함.
 - scripts, app/src/test, app/src/androidTest, mobile/test, server/test_*.py: 단위·통합 검증.
@@ -29,11 +35,11 @@
 
 [0.2.6 제출 자료 릴리스](https://github.com/neolabs120-mobile/pleos-rental-check/releases/tag/v0.2.6-submission)에서 받습니다.
 
-- `rentcheck_vehicle_0.2.8_release.apk`: Kotlin/Compose 차량용, Android 9 이상, 실제 Pleos 환경과 정상 VIN 필요.
+- `rentcheck_vehicle_0.2.9_release.apk`: Kotlin/Compose 차량용, Android 9 이상, 실제 Pleos 환경과 정상 VIN 필요.
 - [`rentcheck_mobile_0.2.8_release.apk`](https://github.com/neolabs120-mobile/pleos-rental-check/releases/download/v0.2.6-submission/rentcheck_mobile_0.2.8_release.apk): 최신 Flutter 휴대폰용, Android 7 이상, 상단 연결 카드·링크 입력, 설정에서 HTTPS 서버 주소 입력.
 - `rentcheck_demo_0.2.6_3min.mp4`: 1920×1080·30fps·3분, 실제 AVD 화면·Flutter 웹 캡처와 당시 실제 Pleos 출력 음성.
-- `SHA256SUMS_0.2.8.txt`: 최신 차량·Flutter APK·소스 ZIP·안내문 지문. 이전 `APK_SHA256.txt`는 0.2.6 APK 두 개의 지문입니다. 새 APK도 같은 배포 키로 서명했고 debuggable=false입니다.
-- `rentcheck_source_0.2.8.zip`: 이번 소스 스냅샷입니다. 기존 0.2.6 태그의 자동 Source code ZIP은 이전 버전으로 유지됩니다.
+- `SHA256SUMS_0.2.9.txt`: 최신 차량 APK·소스 ZIP·안내문 지문. Flutter 0.2.8 지문은 `SHA256SUMS_0.2.8.txt`를 참고하세요. 이전 `APK_SHA256.txt`는 0.2.6 APK 두 개의 지문입니다. 새 APK도 같은 배포 키로 서명했고 debuggable=false입니다.
+- `rentcheck_source_0.2.9.zip`: 이번 소스 스냅샷입니다. 기존 0.2.6 태그의 자동 Source code ZIP은 이전 버전으로 유지됩니다.
 
 이전 차량 0.2.6·Flutter 0.2.6/0.2.7 APK와 영상·지문 파일도 그대로 보존했습니다. 새 시연 영상은 최종 개선 완료 후 별도 요청에 따라 게시합니다.
 
@@ -84,7 +90,7 @@ python server/issue_booking.py --base-url http://127.0.0.1:8788 --email 본인_�
 
 ## 검증
 
-최신 0.2.8은 [반납 장소 검증](docs/RETURN_LOCATION_0.2.8.md)을 따릅니다. 아래는 이전 전체 반납·영상 근거입니다.
+최신 UI는 [차량0.2.9 검증](docs/NATIVE_UI_0.2.9.md), SDK 통합은 [반납 장소0.2.8](docs/RETURN_LOCATION_0.2.8.md)을 따릅니다. 아래는 이전 전체 반납·영상 근거입니다.
 
 0.2.6 Android Debug 82/Release 80, 빌드와 Lint 오류 0. 밝은 화면·음성 팝업·연결·620dp/큰 글자·야간 5조건을 확인했습니다. 최신 실제 체험에서 정상 계정 연결·인수·반납 저장 후 Flutter 웹 사진 3장·직접 확인 3종·최종 접수와 차량/웹/서버 번호 일치를 확인했습니다. TTS 10조건은 선행 0.2.5 검증 근거이며 이번 영상에서도 실제 한국어 안내 완료와 출력 PCM을 다시 확인했습니다. 자세한 범위는 docs/VALIDATION.md를 따릅니다.
 
