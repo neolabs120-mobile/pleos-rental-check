@@ -15,6 +15,7 @@ class AccountUser {
 }
 
 class Booking {
+  // Keep the operator's optional destination attached to its booking; older reservations have no invented return location.
   Booking.fromJson(Json j)
     : id = j['id'] as String,
       number = j['bookingNumber'] as String,
@@ -22,12 +23,41 @@ class Booking {
       vinSuffix = j['vinSuffix'] as String,
       isDemo = j['isDemo'] == true,
       rentalId = j['rentalId'] as String?,
-      submittedAt = millis(j['submittedAtMillis']);
+      submittedAt = millis(j['submittedAtMillis']),
+      returnLocation = j['returnLocation'] == null
+          ? null
+          : ReturnLocation.fromJson(j['returnLocation'] as Json);
   final String id, number, vehicleName, vinSuffix;
   final bool isDemo;
   final String? rentalId;
   final DateTime? submittedAt;
+  final ReturnLocation? returnLocation;
   bool get isSubmitted => submittedAt != null;
+}
+
+class ReturnLocation {
+  // Validate the server-issued coordinates without requesting phone location or treating this metadata as an arrival confirmation.
+  ReturnLocation.fromJson(Json j)
+    : name = j['name'] as String,
+      address = j['address'] as String,
+      latitude = (j['latitude'] as num).toDouble(),
+      longitude = (j['longitude'] as num).toDouble(),
+      instructions = j['instructions'] as String? ?? '',
+      isTest = j['isTest'] == true {
+    if (name.trim().isEmpty ||
+        address.trim().isEmpty ||
+        !latitude.isFinite ||
+        !longitude.isFinite ||
+        latitude < -90 ||
+        latitude > 90 ||
+        longitude < -180 ||
+        longitude > 180) {
+      throw const FormatException('반납 장소 정보를 확인해 주세요.');
+    }
+  }
+  final String name, address, instructions;
+  final double latitude, longitude;
+  final bool isTest;
 }
 
 class EmailChallenge {

@@ -15,6 +15,7 @@ from uuid import UUID, uuid4
 
 from fastapi import Depends, Header, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from return_location import ReturnLocation
 
 TERMS_VERSION = "competition-draft-2026-10"
 ITERATIONS = 600_000
@@ -88,6 +89,7 @@ class Invitation(EmailForm):
     vehicleName: str = Field(default="대여 차량", min_length=1, max_length=80)
     bookingNumber: str = Field(default="", max_length=40, pattern=r"^[A-Za-z0-9-]*$")
     isDemo: bool = False
+    returnLocation: ReturnLocation | None = None
 
 
 class Claim(Form):
@@ -134,6 +136,9 @@ class Accounts:
             if "booking_id" not in columns:
                 connection.execute("ALTER TABLE rentals ADD COLUMN booking_id TEXT REFERENCES bookings(id)")
             connection.execute("CREATE UNIQUE INDEX IF NOT EXISTS rental_booking ON rentals(booking_id) WHERE booking_id IS NOT NULL")
+            # Keep legacy booking rows intact and store only the operator's destination, never live vehicle coordinates.
+            if "return_location" not in {row[1] for row in connection.execute("PRAGMA table_info(bookings)")}:
+                connection.execute("ALTER TABLE bookings ADD COLUMN return_location TEXT")
 
         @app.post("/api/auth/signup")
         def signup(body: Signup, request: Request):
@@ -225,12 +230,16 @@ class Accounts:
 
         @app.post("/api/device/bookings", dependencies=[Depends(authorize)])
         def invite(body: Invitation):
+            # Bind a validated optional return location to this invitation without changing existing reservations or ownership.
+            if body.returnLocation and body.returnLocation.isTest and not body.isDemo:
+                raise HTTPException(422, "시험 반납 장소는 시연 예약에서만 사용할 수 있어요.")
             identifier, code = str(uuid4()), secrets.token_urlsafe(24)
             number = body.bookingNumber.upper() or "RC-" + secrets.token_hex(5).upper()
             with db() as connection:
                 try:
-                    connection.execute("INSERT INTO bookings VALUES(?,?,?,?,?,?,NULL,?,?)", (identifier, number,
-                        body.email, digest(code), body.vin, body.vehicleName, int(body.isDemo), millis()))
+                    connection.execute("INSERT INTO bookings(id,booking_number,email,claim_hash,vin,vehicle_name,user_id,is_demo,created_at,return_location) VALUES(?,?,?,?,?,?,NULL,?,?,?)", (identifier, number,
+                        body.email, digest(code), body.vin, body.vehicleName, int(body.isDemo), millis(),
+                        body.returnLocation.model_dump_json() if body.returnLocation else None))
                 except sqlite3.IntegrityError:
                     raise HTTPException(409, "이미 사용 중인 예약번호입니다.") from None
             return {"bookingId": identifier, "bookingNumber": number, "claimCode": code, "isDemo": body.isDemo}
@@ -255,7 +264,7 @@ class Accounts:
                 rows = connection.execute("SELECT b.*,r.id rental_id,r.submitted_at FROM bookings b LEFT JOIN rentals r ON r.booking_id=b.id WHERE b.user_id=? OR (b.user_id IS NULL AND b.email=?) ORDER BY b.created_at DESC", (user["id"], user["email"])).fetchall()
             return {"bookings": [{"id": r["id"], "bookingNumber": r["booking_number"], "vehicleName": r["vehicle_name"],
                 "vinSuffix": r["vin"][-6:], "isDemo": bool(r["is_demo"]), "rentalId": r["rental_id"],
-                "submittedAtMillis": r["submitted_at"]} for r in rows]}
+                "submittedAtMillis": r["submitted_at"], "returnLocation": json.loads(r["return_location"]) if r["return_location"] else None} for r in rows]}
 
         @app.post("/api/device/pairings", dependencies=[Depends(authorize)])
         def create_pairing(body: PairRequest):
@@ -268,13 +277,15 @@ class Accounts:
 
         @app.get("/api/device/pairings/{pairing_id}", dependencies=[Depends(authorize)])
         def pairing_status(pairing_id: UUID):
+            # Deliver a destination only within the existing authenticated, approved vehicle pairing.
             with db() as connection:
-                row = connection.execute("SELECT p.*,b.booking_number,u.nickname FROM pairings p LEFT JOIN bookings b ON b.id=p.booking_id LEFT JOIN users u ON u.id=p.user_id WHERE p.id=?", (str(pairing_id),)).fetchone()
+                row = connection.execute("SELECT p.*,b.booking_number,b.return_location,u.nickname FROM pairings p LEFT JOIN bookings b ON b.id=p.booking_id LEFT JOIN users u ON u.id=p.user_id WHERE p.id=?", (str(pairing_id),)).fetchone()
             if not row or row["revoked"]:
                 return {"status": "disconnected"}
             if row["booking_id"]:
                 return {"status": "connected", "bookingId": row["booking_id"], "bookingNumber": row["booking_number"],
-                    "nickname": row["nickname"], "vin": row["vin"], "vinSuffix": row["vin"][-6:]}
+                    "nickname": row["nickname"], "vin": row["vin"], "vinSuffix": row["vin"][-6:],
+                    "returnLocation": json.loads(row["return_location"]) if row["return_location"] else None}
             return {"status": "expired" if row["expires_at"] <= millis() else "waiting"}
 
         @app.delete("/api/device/pairings/{pairing_id}", dependencies=[Depends(authorize)])

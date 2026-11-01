@@ -15,6 +15,10 @@ enum class InspectionStage(val title: String) {
 }
 
 sealed interface InspectionEvent {
+    data object RequestReturnLocationPermission : InspectionEvent
+    data object RetryReturnLocation : InspectionEvent
+    data class RequestReturnDirections(val destination: kr.taeuk.pleos.rentalcheck.navigation.ReturnLocation) : InspectionEvent
+    data object OpenReturnNavigation : InspectionEvent
     data object OpenPractice : InspectionEvent
     data class StartPractice(val key: String, val label: String) : InspectionEvent
     data object ClosePractice : InspectionEvent

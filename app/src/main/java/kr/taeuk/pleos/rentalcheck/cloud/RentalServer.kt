@@ -88,12 +88,15 @@ class RentalServer(private val settings: () -> ServerConfig, private val store: 
 
     companion object {
         fun parsePairingStatus(json: JSONObject): PairingStatus {
+            // Decode the operator-issued destination only from an approved pairing response; legacy bookings have no destination.
             val status = json.getString("status")
             require(status in listOf("connected", "waiting", "expired", "disconnected")) { "알 수 없는 차량 연결 상태입니다." }
             return PairingStatus(status, if (status == "connected") PairedBooking(json.getString("bookingId"),
                 json.getString("bookingNumber"), json.getString("nickname"), json.getString("vin").also {
                     require(kr.taeuk.pleos.rentalcheck.model.VehicleIdentity.normalize(it) == it) { "연결 차량 VIN 형식이 올바르지 않습니다." }
-                }) else null)
+                }, json.optJSONObject("returnLocation")?.let { place -> kr.taeuk.pleos.rentalcheck.navigation.ReturnLocation(
+                    place.getString("name"), place.getString("address"), place.getDouble("latitude"), place.getDouble("longitude"),
+                    place.optString("instructions", ""), place.optBoolean("isTest", false)) }) else null)
         }
         fun parseSummary(json: JSONObject, expectedId: String): CloudSummary {
             require(json.getString("id") == expectedId) { "다른 이용 기록의 서버 응답입니다." }

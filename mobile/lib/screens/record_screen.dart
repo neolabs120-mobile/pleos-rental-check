@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+
 import '../app_scope.dart';
 import '../models/rental_models.dart';
 import '../ui/components.dart';
 import '../ui/usage_memory_notice.dart';
 import '../ui/secure_photo.dart';
+import '../ui/return_location_notice.dart';
 import 'evidence_screen.dart';
 
 class RecordScreen extends StatefulWidget {
@@ -24,9 +26,8 @@ class _RecordScreenState extends State<RecordScreen> with ActionState {
   }
 
   Future<void> load() async {
-    final r = await RentalScope.of(
-      context,
-    ).api.record(widget.booking.rentalId!);
+    final r = await RentalScope.of(context).api
+        .record(widget.booking.rentalId!);
     if (mounted) setState(() => record = r);
   }
 
@@ -44,9 +45,8 @@ class _RecordScreenState extends State<RecordScreen> with ActionState {
         const SizedBox(height: 8),
         Text(
           value,
-          style: Theme.of(
-            context,
-          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+          style: Theme.of(context).textTheme.titleLarge
+              ?.copyWith(fontWeight: FontWeight.bold),
         ),
       ],
     ),
@@ -72,6 +72,8 @@ class _RecordScreenState extends State<RecordScreen> with ActionState {
           ),
         ],
         if (r != null) ...[
+          if (widget.booking.returnLocation != null)
+            Panel(child: ReturnLocationNotice(widget.booking.returnLocation!)),
           if (r.isDemo) Notice(r.demoNotice),
           if (r.returnAt != null) UsageMemoryNotice(r.usageMemory),
           if (r.isSubmitted)

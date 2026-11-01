@@ -4,6 +4,7 @@ import '../app_scope.dart';
 import '../data/connection_link.dart';
 import '../models/rental_models.dart';
 import '../ui/components.dart';
+import '../ui/return_location_notice.dart';
 import 'claim_booking_screen.dart';
 import 'evidence_screen.dart';
 import 'policy_screen.dart';
@@ -163,6 +164,11 @@ class _HomeScreenState extends State<HomeScreen> with ActionState {
         Text('예약 ${booking.number}'),
         const SizedBox(height: 6),
         Text('VIN 끝 6자리 ${booking.vinSuffix}'),
+        if (booking.returnLocation != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: ReturnLocationNotice(booking.returnLocation!),
+          ),
         if (booking.isDemo)
           const Padding(
             padding: EdgeInsets.only(top: 12),
@@ -243,9 +249,8 @@ class _HomeScreenState extends State<HomeScreen> with ActionState {
               children: [
                 Text(
                   '${state.user!.nickname}님, 반가워요',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                  style: Theme.of(context).textTheme.titleLarge
+                      ?.copyWith(fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 8),
                 const Text('예약한 이메일의 차량이 자동으로 보여요.'),
@@ -277,9 +282,8 @@ class _HomeScreenState extends State<HomeScreen> with ActionState {
                 Expanded(
                   child: Text(
                     '이용할 예약',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: Theme.of(context).textTheme.titleLarge
+                        ?.copyWith(fontWeight: FontWeight.w700),
                   ),
                 ),
                 Text('${rows.length}건'),

@@ -215,6 +215,51 @@ class AccountTests(unittest.TestCase):
         self.clock[0]+=301
         self.assertEqual(410,self.approve(invite,fresh_token,auth).status_code)
 
+    def test_return_location_requires_operator_and_follows_booking_ownership(self):
+        # Only the verified recipient and an approved device pairing may receive this operator-issued destination.
+        auth = self.account(); outsider = self.account('other@example.com')
+        place = dict(name='에뮬레이터 시험 장소', address='시험 주소', latitude=37.48544722, longitude=127.03636666,
+            instructions='지정 구역을 직접 확인하세요.', isTest=True)
+        body = dict(email='renter@example.com', vin='KMHTEST00TEST0001', isDemo=True, returnLocation=place)
+        self.assertEqual(401, self.client.post('/api/device/bookings', json=body).status_code)
+        response = self.client.post('/api/device/bookings', json=body, headers=self.device)
+        self.assertEqual(200, response.status_code, response.text)
+        invite = response.json()
+        self.assertEqual(place, self.client.get('/api/account/bookings', headers=auth).json()['bookings'][0]['returnLocation'])
+        self.assertEqual([], self.client.get('/api/account/bookings', headers=outsider).json()['bookings'])
+        pair, token = self.pair()
+        path = '/api/device/pairings/' + pair['id']
+        self.assertNotIn('returnLocation', self.client.get(path, headers=self.device).json())
+        self.assertEqual(200, self.approve(invite, token, auth).status_code)
+        self.assertEqual(place, self.client.get(path, headers=self.device).json()['returnLocation'])
+
+    def test_return_location_rejects_invalid_coordinates_labels_and_unmarked_tests(self):
+        # Invalid or partial destinations must fail validation before any invitation is stored; non-finite values cannot become zero.
+        point = dict(name='시험', address='주소', latitude=37.4, longitude=127.0, isTest=True)
+        body = dict(email='renter@example.com', vin='KMHTEST00TEST0001', isDemo=True, returnLocation=point)
+        invalid = [dict(latitude=91), dict(longitude=-181), dict(latitude=float('nan')), dict(longitude=float('inf')),
+            dict(name=' '), dict(address=' '), dict(extra='unexpected')]
+        for change in invalid:
+            response = self.client.post('/api/device/bookings', content=json.dumps({**body, 'returnLocation':{**point, **change}}),
+                headers={**self.device, 'Content-Type':'application/json'})
+            self.assertEqual(422, response.status_code, response.text)
+        self.assertEqual(422, self.client.post('/api/device/bookings', json={**body,'isDemo':False}, headers=self.device).status_code)
+        self.assertEqual(422, self.client.post('/api/device/bookings', json={**body,'returnLocation':{'name':'partial'}}, headers=self.device).status_code)
+
+    def test_return_location_migration_preserves_legacy_booking_fields(self):
+        # Adding the optional column must preserve all old invitation/ownership fields and remain safe on a second server restart.
+        self.invitation()
+        db_path = self.path / 'rentals.sqlite3'
+        with closing(sqlite3.connect(db_path)) as db:
+            db.execute('ALTER TABLE bookings DROP COLUMN return_location')
+            db.commit()
+            before = db.execute('SELECT * FROM bookings').fetchall()
+        for _ in range(2):
+            create_app(self.path, self.key, 'https://rental.example.test', clock=lambda:self.clock[0])
+            with closing(sqlite3.connect(db_path)) as db:
+                rows = db.execute('SELECT * FROM bookings').fetchall()
+                self.assertEqual(before, [row[:-1] for row in rows]); self.assertTrue(all(row[-1] is None for row in rows))
+
     def test_users_and_sessions_survive_restart(self):
         auth=self.account()
         app=create_app(self.path,self.key,'https://rental.example.test',clock=lambda:self.clock[0])

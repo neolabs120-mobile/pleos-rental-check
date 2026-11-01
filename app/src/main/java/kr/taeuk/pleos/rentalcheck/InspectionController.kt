@@ -14,6 +14,7 @@ import kr.taeuk.pleos.rentalcheck.speech.PleosSpeechEngine
 import kr.taeuk.pleos.rentalcheck.speech.ReturnSeatSpeech
 import kr.taeuk.pleos.rentalcheck.speech.SeatSpeechState
 import kr.taeuk.pleos.rentalcheck.cloud.*
+import kr.taeuk.pleos.rentalcheck.navigation.*
 import kr.taeuk.pleos.rentalcheck.vehicle.createVehicleEnvironment
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -53,6 +54,7 @@ data class InspectionUiState(
     val emulatorTestAvailable: Boolean = false,
     val emulatorTestEnabled: Boolean = false,
     val assistance: TripAssistanceState = TripAssistanceState(),
+    val returnGuide: ReturnGuideState = ReturnGuideState(),
 )
 
 /** Retained across Activity recreation. In-flight bounded reads drain before release(). */
@@ -82,6 +84,11 @@ class InspectionController(context: Context) {
     private val assistance = TripAssistanceController(context.applicationContext, source, scope, ::ensureSource) {
         state = state.copy(assistance = it); publish()
     }
+    private val returnGuide = ReturnGuideController(PleosReturnGuideEngine(context.applicationContext, scope), scope, {
+        // Location/navigation callbacks update presentation without recursively restarting subscriptions or changing inspection records.
+        state = state.copy(returnGuide = it)
+        if (foreground) onChanged?.invoke(state)
+    })
 
     init {
         try {
@@ -117,6 +124,7 @@ class InspectionController(context: Context) {
 
     fun stop() {
         foreground = false
+        returnGuide.stop()
         returnSpeech.stop()
         assistance.stop()
         pairingPoll?.cancel()
@@ -144,6 +152,10 @@ class InspectionController(context: Context) {
                 InspectionEvent.DisconnectAccount, InspectionEvent.StartNewPickup) && event !is InspectionEvent.ConfigureServer &&
                 event !is InspectionEvent.SetEmulatorTestMode) return
         when (event) {
+            InspectionEvent.RequestReturnLocationPermission -> Unit // The Activity owns the driver's explicit Android permission prompt.
+            InspectionEvent.RetryReturnLocation -> if (foreground && state.stage in listOf(InspectionStage.ACTIVE, InspectionStage.RETURN)) returnGuide.retry()
+            is InspectionEvent.RequestReturnDirections -> requestReturnDirections(event.destination)
+            InspectionEvent.OpenReturnNavigation -> if (state.stage in listOf(InspectionStage.ACTIVE, InspectionStage.RETURN)) returnGuide.openNavigation()
             InspectionEvent.OpenPractice -> if (state.stage in listOf(InspectionStage.CONNECT, InspectionStage.PICKUP, InspectionStage.ACTIVE)) assistance.openPractice()
             is InspectionEvent.StartPractice -> if (state.assistance.practiceOpen) assistance.startPractice(event.key, event.label)
             InspectionEvent.ClosePractice -> assistance.closePractice()
@@ -482,6 +494,26 @@ class InspectionController(context: Context) {
         }
     }
 
+    // Re-read actual gear and VIN after confirmation so a delayed tap cannot change Navigation while driving or for a different rental.
+    private fun requestReturnDirections(destination: ReturnLocation) {
+        if (!foreground || state.stage !in listOf(InspectionStage.ACTIVE, InspectionStage.RETURN) ||
+            state.record?.returned != null || state.returnGuide.destination != destination || !state.returnGuide.navigation.connected ||
+            state.returnGuide.navigation.busy || readJob?.isActive == true) return
+        val booking = state.pairedBooking ?: return
+        readJob = scope.launch {
+            state = state.copy(busy = true, errorMessage = null); publish()
+            try {
+                val snapshot = withContext(Dispatchers.IO) { ensureSource(); source.readSnapshot() }
+                check(foreground && state.pairedBooking?.id == booking.id && state.record?.bookingId == booking.id) { "현재 연결된 예약을 다시 확인해 주세요." }
+                check(state.returnGuide.destination == destination) { "반납 장소가 변경됐어요. 다시 확인해 주세요." }
+                check(VehicleIdentity.vin(snapshot) == booking.vin) { "연결한 차량 VIN을 확인하지 못했어요." }
+                check(snapshot.find("gear.selection")?.let { it.available && it.value == "GEAR_PARK" } == true) { "길 안내 설정은 P 상태에서 진행해 주세요." }
+                state = state.copy(current = snapshot); returnGuide.navigate()
+            } catch (error: Exception) { state = state.copy(errorMessage = error.message?.take(240) ?: "길 안내를 요청하지 못했어요.") }
+            finally { state = state.copy(busy = false); publish(); if (!foreground || disposing) release(); if (disposing) scope.cancel() }
+        }
+    }
+
     // Give window/authorization/lifecycle guards priority over audio and let only fresh occupied-seat notices request automatic speech.
     private fun canSpeakReturnNotice(): Boolean = foreground && !disposing && !state.busy && state.pairedBooking != null &&
         state.record?.bookingId == state.pairedBooking?.id && VehicleIdentity.vin(state.current) == state.pairedBooking?.vin &&
@@ -490,6 +522,11 @@ class InspectionController(context: Context) {
 
     // Share one authoritative notice state with Compose and speech; cloud polling must not cause the same seat set to be announced repeatedly.
     private fun publish() {
+        val guideEnabled = foreground && !disposing && state.stage in listOf(InspectionStage.ACTIVE, InspectionStage.RETURN) &&
+            state.record?.returned == null && state.record?.bookingId == state.pairedBooking?.id &&
+            state.pairedBooking != null && VehicleIdentity.vin(state.current) == state.pairedBooking?.vin
+        returnGuide.attach(if (guideEnabled) serverConfig.baseUrl + "|" + state.pairedBooking!!.id else null,
+            if (guideEnabled) state.pairedBooking?.returnLocation else null)
         val identity = state.record?.let { serverConfig.baseUrl + "|" + it.bookingId + "|" + it.id }
         returnSpeech.update(identity, state.returnOccupiedSeats, canSpeakReturnNotice())
         if (foreground) onChanged?.invoke(state)

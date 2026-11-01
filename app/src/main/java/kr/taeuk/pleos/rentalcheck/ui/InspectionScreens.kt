@@ -74,6 +74,9 @@ fun RentalCheckScreen(state: InspectionUiState, onEvent: (InspectionEvent) -> Un
             LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(if (wide) 20.dp else 16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 item("title") { ContentWidth { ScreenHeading(state) } }
+                if (state.stage in listOf(InspectionStage.ACTIVE, InspectionStage.RETURN)) item("return-location") {
+                    ContentWidth { ReturnLocationCard(state, onEvent) }
+                }
                 if (state.stage in listOf(InspectionStage.CONNECT, InspectionStage.PICKUP)) item("practice") {
                     ContentWidth { FamiliarizationCard(state, onEvent) }
                 }

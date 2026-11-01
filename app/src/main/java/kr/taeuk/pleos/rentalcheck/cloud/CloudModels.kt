@@ -6,7 +6,8 @@ data class ServerConfig(val baseUrl: String = "", val deviceToken: String = "") 
 
 data class PhotoLink(val uploadUrl: String, val expiresAtMillis: Long, val phase: String)
 data class VehiclePairing(val id: String, val pairingUrl: String, val expiresAtMillis: Long)
-data class PairedBooking(val id: String, val number: String, val nickname: String, val vin: String)
+data class PairedBooking(val id: String, val number: String, val nickname: String, val vin: String,
+    val returnLocation: kr.taeuk.pleos.rentalcheck.navigation.ReturnLocation? = null)
 data class PairingStatus(val status: String, val booking: PairedBooking? = null)
 data class EvidencePhoto(val id: String, val phase: String, val category: String)
 data class EvidenceChecks(val windows: Boolean = false, val belongings: Boolean = false, val exterior: Boolean = false,
