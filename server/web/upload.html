@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>렌트체크 · 사진 전송</title>
+  <link rel="stylesheet" href="/static/upload.css">
+  <script src="/static/upload.js" defer></script>
+</head>
+<body>
+  <main>
+    <header><span class="brand">렌트체크</span><span id="phase">사진 전송</span></header>
+    <h1>차량 상태를 사진으로 남겨 주세요</h1>
+    <p id="session">차량 화면의 QR로 접속해 주세요.</p>
+    <p id="notice" role="status" aria-live="polite"></p>
+    <section id="photos" aria-label="사진 첨부 항목"></section>
+    <section class="panel" id="check-panel" hidden>
+      <h2>직접 확인한 내용</h2>
+      <label class="check"><input type="checkbox" id="check-windows">창문을 직접 확인했어요.</label>
+      <label class="check"><input type="checkbox" id="check-belongings">실내 소지품을 직접 확인했어요.</label>
+      <label class="check"><input type="checkbox" id="check-exterior">차량 외관을 직접 확인했어요.</label>
+      <label for="note">추가로 남길 내용 (선택)</label>
+      <textarea id="note" maxlength="500" rows="3" placeholder="흠집 위치 등 직접 확인한 내용을 적어 주세요."></textarea>
+      <button type="button" id="save-checks">확인 내역 전송</button>
+      <button type="button" id="submit" hidden disabled>점검 기록 최종 제출</button>
+      <p id="completion">사진과 직접 확인 내역을 모두 보낸 뒤 휴대전화에서 최종 제출할 수 있어요.</p>
+    </section>
+    <p><a href="/account">내 계정·이용 기록으로 이동</a></p>
+    <footer>사진은 상태 관측 기록으로 저장돼요. 사진만으로 닫힘·분실·손상 여부를 자동 판정하지 않아요.</footer>
+  </main>
+</body>
+</html>

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer"><title>렌트체크 · 내 계정</title>
+  <link rel="stylesheet" href="/static/upload.css"><link rel="stylesheet" href="/static/account.css">
+  <script src="/static/account.js" defer></script>
+</head>
+<body><main>
+  <header><span class="brand">렌트체크</span><span>내 계정</span></header>
+  <p id="notice" role="status" aria-live="polite"></p>
+  <div id="screen"></div>
+  <footer>차량 점검 기록을 보관하는 서비스예요. 렌터카 업체의 최종 반납·요금 정산은 별도로 진행돼요.</footer>
+</main>
+<template id="welcome"><section class="panel hero"><div class="symbol" aria-hidden="true">✓</div><h1>렌터카 점검 기록을 한곳에</h1><p>인수부터 반납까지 기록해요.<br>사진과 제출 내역을 다시 확인해요.</p><div class="feature">내 점검 기록 보관</div><div class="feature">차량 QR로 간편 연결</div><button class="primary" data-route="signup">회원가입</button><button data-route="login">로그인</button></section></template>
+<template id="signup"><h1>계정 만들기</h1><form class="panel" id="signup-form">
+  <label>닉네임<input name="nickname" autocomplete="nickname" maxlength="32" required></label>
+  <label>이메일<input name="email" type="email" autocomplete="email" maxlength="254" required></label>
+  <label>비밀번호<input name="password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>
+  <button type="button" class="text" data-password="password">비밀번호 보기</button>
+  <label>비밀번호 확인<input name="confirm" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>
+  <p>비밀번호는 12자 이상 입력해 주세요.</p>
+  <label class="check"><input name="terms" type="checkbox" required>이용약관 동의 (필수)</label><button type="button" class="text" data-policy="terms">이용약관 보기</button>
+  <label class="check"><input name="privacy" type="checkbox" required>개인정보 수집·이용 동의 (필수)</label><button type="button" class="text" data-policy="privacy">개인정보 안내 보기</button>
+  <button class="primary" type="submit">이메일 확인번호 받기</button><button type="button" class="text" data-route="login">이미 계정이 있어요 · 로그인</button>
+</form></template>
+<template id="verify"><h1>이메일을 확인해 주세요</h1><form class="panel" id="verify-form"><p id="verify-email"></p><p id="delivery-notice">확인번호를 보냈어요. 10분 안에 입력해 주세요.</p><label>이메일 확인번호<input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required></label><button class="primary" type="submit">확인하고 가입 완료</button><button type="button" id="resend">확인번호 다시 받기</button><button type="button" class="text" data-route="signup">이메일 주소 수정</button></form></template>
+<template id="login"><h1>다시 만나서 반가워요</h1><form class="panel" id="login-form"><label>이메일<input name="email" type="email" autocomplete="username" maxlength="254" required></label><label>비밀번호<input name="password" type="password" autocomplete="current-password" maxlength="128" required></label><button type="button" class="text" data-password="password">비밀번호 보기</button><button class="primary" type="submit">로그인</button><button type="button" class="text" data-route="reset">비밀번호를 잊으셨나요?</button><button type="button" class="text" data-route="signup">계정이 없나요? 회원가입</button></form></template>
+<template id="reset"><h1>비밀번호 재설정</h1><form class="panel" id="reset-request"><p>가입한 이메일로 확인번호를 보내요.</p><label>이메일<input name="email" type="email" autocomplete="email" maxlength="254" required></label><button class="primary" type="submit">확인번호 받기</button><button type="button" class="text" data-route="login">로그인으로 돌아가기</button></form></template>
+<template id="reset-verify"><h1>새 비밀번호 설정</h1><form class="panel" id="reset-form"><label>이메일 확인번호<input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required></label><label>새 비밀번호<input name="password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label><label>비밀번호 확인<input name="confirm" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label><button class="primary" type="submit">비밀번호 변경</button><button type="button" class="text" data-route="reset">확인번호 다시 요청</button></form></template>
+<template id="home"><div class="heading"><h1>내 대여</h1><button id="logout">로그아웃</button></div><p id="greeting"></p><section class="panel" id="pair-banner" hidden><h2>차량 연결 요청</h2><p>예약 차량이 맞는지 확인하고 아래 대여 건에서 연결을 승인해 주세요. QR은 발급 후 5분 동안 사용할 수 있어요.</p><button class="text" id="cancel-pair">연결 요청 취소</button></section><section class="panel" id="upload-banner" hidden><h2>사진 전송 이어가기</h2><p>이 계정의 대여 건이라면 사진 전송 화면으로 이동할 수 있어요.</p><button class="primary" id="resume-upload">사진 전송 화면 열기</button></section><div id="bookings"></div><button class="text" data-route="claim">예약이 보이지 않나요? · 코드로 연결</button><p>예약에 사용한 이메일로 로그인하면 내 예약이 자동으로 표시돼요. 차량 QR을 읽고 예약한 차량의 연결을 승인해 주세요.</p></template>
+<template id="claim"><h1>예약 직접 연결</h1><form class="panel" id="claim-form"><p>예약은 로그인한 이메일로 자동 표시돼요. 별도로 받은 번호와 코드가 있을 때만 직접 연결해 주세요.</p><label>예약번호<input name="bookingNumber" autocomplete="off" maxlength="40" required placeholder="RC-…"></label><label>예약 연결 코드<input name="claimCode" autocomplete="off" minlength="16" maxlength="128" required></label><button class="primary" type="submit">내 계정에 연결</button><button type="button" class="text" data-route="home">내 대여로 돌아가기</button></form></template>
+<template id="detail"><h1>내 점검 기록</h1><section class="panel" id="record-summary"></section><section class="panel"><h2>보관된 사진·확인 내역</h2><div id="record-photos"></div></section><button data-route="home">내 대여로 돌아가기</button></template>
+<dialog id="policy"><h2 id="policy-title"></h2><p id="policy-text"></p><button id="close-policy">닫기</button></dialog>
+</body></html>

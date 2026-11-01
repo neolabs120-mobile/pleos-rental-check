@@ -1,0 +1,104 @@
+package kr.taeuk.pleos.rentalcheck.ui
+
+import android.os.SystemClock
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import kr.taeuk.pleos.rentalcheck.*
+import kr.taeuk.pleos.rentalcheck.model.*
+import kotlinx.coroutines.delay
+
+// Present limited seat signals separately from luggage memory; neither a missing signal nor an unoccupied result proves belongings are absent.
+@Composable
+internal fun SeatOccupancyCard(readings: List<VehicleReading>, saved: Boolean) {
+    Panel {
+        BoxWithConstraints {
+            val explanation: @Composable () -> Unit = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    PanelTitle("좌석 점유 신호")
+                    val occupied = readings.count { it.available && it.value == "true" && it.displayValue == "점유" }
+                    StateBadge(if (occupied > 0) "점유 신호 ${occupied}곳" else "각 공간을 직접 확인해 주세요", occupied > 0)
+                    Text("좌석과 발밑의 소지품을 한 번 더 살펴보세요.")
+                    Muted("사람과 짐은 구분하지 않아요. 비점유여도 작은 물건과 다른 공간은 직접 확인해 주세요.")
+                    val at = readings.maxOfOrNull { it.observedAtMillis } ?: 0
+                    if (at > 0) Muted((if (saved) "반납 저장 시점 · " else "최근 수신 · ") + inspectionTime(at))
+                }
+            }
+            if (maxWidth >= 760.dp) Row(horizontalArrangement = Arrangement.spacedBy(32.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(.9f)) { explanation() }; Box(Modifier.weight(1f)) { SeatMap(readings) }
+            } else Column(verticalArrangement = Arrangement.spacedBy(18.dp)) { explanation(); SeatMap(readings) }
+        }
+    }
+}
+
+// Introduce the optional stationary exercise without replacing pickup/return inspection or making it a prerequisite for rental use.
+@Composable
+internal fun FamiliarizationCard(state: InspectionUiState, onEvent: (InspectionEvent) -> Unit) {
+    Panel {
+        PanelTitle("처음 타는 차 · 90초 적응 가이드")
+        Text(if (state.assistance.practiceCompleted) "창문을 실제로 열고 닫는 연습을 마쳤어요." else "출발 전에 실제 차량 버튼으로 창문 조작을 익혀 보세요.")
+        Muted("완전히 정차하고 P단인 경우에만 진행해요. 연습은 선택 사항이며, 차량을 자동 조작하지 않아요.")
+        OutlinedButton(onClick = { onEvent(InspectionEvent.OpenPractice) }, enabled = !state.busy && !state.cloudBusy) {
+            Text(if (state.assistance.practiceCompleted) "다시 연습하기" else "90초 적응 가이드 열기")
+        }
+    }
+}
+
+// Show observed openings and explicit luggage marks separately; neither is a declaration that an object exists or that belongings are all cleared.
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+internal fun UsageMemoryCard(memory: UsageMemory, onMark: ((StorageSpace, Boolean) -> Unit)? = null, problem: String? = null) {
+    Panel {
+        PanelTitle(if (onMark == null) "내리기 전, 사용한 공간 다시 확인" else "짐을 둔 곳 기억하기")
+        if (memory.openedSpaces.isNotEmpty()) Text("앱이 열림을 관측한 곳: " + StorageSpace.entries.filter { it in memory.openedSpaces }.joinToString { it.label })
+        else Muted("관측한 문·트렁크 열림이 아직 없어요. 사용하지 않았다는 뜻은 아니에요.")
+        if (memory.markedSpaces.isNotEmpty()) Text("내가 짐을 뒀다고 표시한 곳: " + StorageSpace.entries.filter { it in memory.markedSpaces }.joinToString { it.label })
+        if (onMark != null) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            StorageSpace.entries.forEach { space -> FilterChip(selected = space in memory.markedSpaces,
+                onClick = { onMark(space, space !in memory.markedSpaces) }, label = { Text(space.label) }) }
+        }
+        Muted(if (onMark != null) "이용 건별로 기기에 보관하고 반납 기록 저장 때 서버로 전송해요. 화면이 꺼진 동안의 동작은 놓칠 수 있어요."
+            else "문을 열었다는 이유로 소지품이 남았다고 판단하지 않아요. 표시된 곳 외에도 직접 확인해 주세요.")
+        problem?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+    }
+}
+
+// Guide a real closed→open→closed sequence with a bounded timer; SDK failures, an expired timer or a non-P gear never count as completion.
+@Composable
+internal fun FamiliarizationDialog(state: InspectionUiState, onEvent: (InspectionEvent) -> Unit) {
+    val practice = state.assistance.practice
+    var now by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
+    LaunchedEffect(practice?.startedElapsedMillis) { while (true) { now = SystemClock.elapsedRealtime(); delay(250) } }
+    val windows = state.current?.readings.orEmpty().filter { it.key.startsWith("window.") && it.key.endsWith(".position") &&
+        state.current?.find(it.key.removeSuffix(".position") + ".closed")?.available == true }
+    AlertDialog(onDismissRequest = { onEvent(InspectionEvent.ClosePractice) }, title = { Text("정차 후 창문 조작 연습") }, text = {
+        Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("출발하기 전 완전히 정차해 주세요. P단을 실제로 수신해야 연습이 진행돼요.")
+            if (practice == null || !practice.running) {
+                if (practice?.step == PracticeStep.COMPLETE) Text("연습 완료! 실제 창문의 닫힘 → 열림 → 닫힘을 확인했어요.")
+                practice?.problem?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                Text("연습할 창문을 선택하세요. 차량의 실제 버튼으로 조작하고 각 단계의 수신을 기다려 주세요.")
+                if (windows.isEmpty()) Text("지원 범위와 현재값을 확인한 창문이 없어요. 차량 정보를 다시 읽거나 가이드를 건너뛰세요.")
+                windows.forEach { window -> OutlinedButton(onClick = { onEvent(InspectionEvent.StartPractice(window.key, window.label)) }) { Text(window.label) } }
+            } else {
+                Text("${practice.label} · 남은 시간 ${practice.remainingSeconds(now)}초")
+                LinearProgressIndicator(progress = { (practice.remainingSeconds(now) / 90f).coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
+                Text(when (practice.step) {
+                    PracticeStep.CLOSE_FIRST -> "먼저 선택한 창문을 닫아 주세요. 닫힌 기준 상태를 확인해요."
+                    PracticeStep.OPEN -> "차량의 실제 창문 버튼으로 조금 열고 기다려 주세요."
+                    PracticeStep.CLOSE -> "열림을 확인했어요. 이제 창문을 완전히 닫고 기다려 주세요."
+                    else -> "확인 중"
+                }, style = MaterialTheme.typography.titleMedium)
+                practice.problem?.let { Text(it) }
+            }
+            Muted("확인되지 않은 동작은 완료 처리하지 않아요. 연습을 중단해도 인수·반납을 진행할 수 있어요. 열었던 창문은 직접 닫아 주세요.")
+        }
+    }, confirmButton = { TextButton(onClick = { onEvent(InspectionEvent.ClosePractice) }) {
+        Text(if (practice?.step == PracticeStep.COMPLETE) "완료하고 돌아가기" else "건너뛰기 · 닫기")
+    } })
+}
