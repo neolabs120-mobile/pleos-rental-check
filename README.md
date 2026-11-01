@@ -2,10 +2,16 @@
 
 처음 카셰어링을 이용하는 사람의 계정 연결·인수·이용·반납 점검을 돕습니다. 차량 신호를 좌석 위치 안내와 한국어 음성으로 연결하고 사진·직접 확인·접수 기록을 보관합니다.
 
+## Flutter 0.2.7 · 상단 연결 카드
+
+홈 상단에 차량 연결 카드를 배치해 QR 스캔과 ‘카메라가 없나요? 링크 입력’을 먼저 보여줍니다. 이용할 예약만 홈에 표시하고 완료된 이용은 기록 탭에 보관합니다. 링크 확인 뒤 예약 차량을 선택하고 명시적으로 연결을 승인하는 절차는 그대로입니다.
+
+[기존 제출 Release 페이지](https://github.com/neolabs120-mobile/pleos-rental-check/releases/tag/v0.2.6-submission)에 최신 휴대폰 APK와 소스 ZIP을 추가했습니다. 차량 앱과 기존 영상은 0.2.6이며, 이번에 영상을 새로 제작하거나 교체하지 않았습니다. [변경·검증·빌드 안내](docs/FLUTTER_HOME_0.2.7.md)
+
 ## 구성
 
 - app: Kotlin/Compose 차량 앱 0.2.6. Pleos Vehicle 2.3.2, vehicle-aidl 1.1.1, TextToSpeech 3.3.1.
-- mobile: Flutter 이용자 앱과 웹. 계정, 예약, QR 승인, 사진, 직접 확인, 접수.
+- mobile: Flutter 이용자 앱과 웹 0.2.7. 계정, 예약, QR 승인, 사진, 직접 확인, 접수.
 - server: FastAPI 서버와 사진·계정 처리. requirements-lock.txt 포함.
 - scripts, app/src/test, app/src/androidTest, mobile/test, server/test_*.py: 단위·통합 검증.
 
@@ -18,9 +24,12 @@
 [0.2.6 제출 자료 릴리스](https://github.com/neolabs120-mobile/pleos-rental-check/releases/tag/v0.2.6-submission)에서 받습니다.
 
 - `rentcheck_vehicle_0.2.6_release.apk`: Kotlin/Compose 차량용, Android 9 이상, 실제 Pleos 환경과 정상 VIN 필요.
-- `rentcheck_mobile_0.2.6_release.apk`: Flutter 휴대폰용, Android 7 이상, 설정에서 HTTPS 서버 주소 입력.
+- [`rentcheck_mobile_0.2.7_release.apk`](https://github.com/neolabs120-mobile/pleos-rental-check/releases/download/v0.2.6-submission/rentcheck_mobile_0.2.7_release.apk): 최신 Flutter 휴대폰용, Android 7 이상, 상단 연결 카드·링크 입력, 설정에서 HTTPS 서버 주소 입력.
 - `rentcheck_demo_0.2.6_3min.mp4`: 1920×1080·30fps·3분, 실제 AVD 화면·Flutter 웹 캡처와 이번 실제 Pleos 출력 음성.
-- `APK_SHA256.txt`: 배포 APK 지문. 두 APK 모두 Release 빌드·별도 배포 키 서명·debuggable=false입니다.
+- `SHA256SUMS_0.2.7.txt`: 최신 Flutter APK·소스 ZIP·안내문 지문. 이전 `APK_SHA256.txt`는 0.2.6 APK 두 개의 지문입니다. 새 APK도 같은 배포 키로 서명했고 debuggable=false입니다.
+- `rentcheck_source_0.2.7.zip`: 이번 소스 스냅샷입니다. 기존 0.2.6 태그의 자동 Source code ZIP은 이전 버전으로 유지됩니다.
+
+이전 Flutter 0.2.6 APK와 영상·지문 파일도 그대로 보존했습니다. 새 시연 영상은 최종 개선 완료 후 별도 요청에 따라 게시합니다.
 
 시연 영상은 알려진 Pleos ARM64 AVD의 Debug에서 명시적으로 테스트 VIN을 켠 새 체험 예약으로 촬영했습니다. 실제 SDK 창문·좌석과 실제 TTS를 사용하며 생성 시험 사진·장면 편집을 표시했습니다. 로그인된 계정에서 시작하고, 웹 사진 선택·전송·직접 확인·최종 접수는 실제 브라우저로 진행했습니다. 차량 장면은 androidTest의 `SubmissionVideoFlowRunner`가 실제 MainActivity/ViewModel의 동일한 이벤트를 호출하며 예시 UI 상태를 주입하지 않습니다.
 

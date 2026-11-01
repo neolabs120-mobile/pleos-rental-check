@@ -1,5 +1,7 @@
 # 0.2.6 제출 영상·Release APK · 2026-11-01
 
+후속 Flutter 최신 버전은 **0.2.7**입니다. 같은 제출 Release 페이지에 새 휴대폰 APK·소스 ZIP을 추가했습니다. 아래 내용은 보존한 차량/휴대폰/영상 0.2.6의 검증 기록이며, [Flutter 0.2.7 변경·검증](FLUTTER_HOME_0.2.7.md)을 함께 확인합니다. 기존 시연 영상은 교체하지 않았습니다.
+
 https://github.com/neolabs120-mobile/pleos-rental-check/releases/tag/v0.2.6-submission
 
 ## 배포물

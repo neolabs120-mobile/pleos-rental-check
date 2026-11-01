@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/testing.dart';
@@ -6,6 +7,7 @@ import 'package:rental_check/data/rental_api.dart';
 import 'package:rental_check/main.dart';
 import 'package:rental_check/models/rental_models.dart';
 import 'package:rental_check/state/rental_controller.dart';
+
 import 'test_support.dart';
 
 // Exercise a reservation issued after home opens, ensuring one QR refreshes it and still requires the driver's explicit confirmation.
@@ -40,7 +42,7 @@ void main() {
     state.api.accountToken = 'mock-account';
     await tester.pumpWidget(RentalCheckApp(controller: state));
     await tester.pumpAndSettle();
-    expect(find.text('표시할 예약이 없어요'), findsOneWidget);
+    expect(find.text('이용할 예약이 없어요'), findsOneWidget);
     expect(find.byType(TextFormField), findsNothing);
     await tester.ensureVisible(find.text('차량 QR 스캔'));
     await tester.tap(find.text('차량 QR 스캔'));

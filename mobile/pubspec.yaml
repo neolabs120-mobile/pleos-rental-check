@@ -1,7 +1,7 @@
 name: rental_check
 description: 렌트체크 이용자용 Flutter 앱
 publish_to: none
-version: 1.0.0+1
+version: 0.2.7+11
 environment:
   sdk: '>=3.10.0 <4.0.0'
   flutter: '>=3.38.0'
