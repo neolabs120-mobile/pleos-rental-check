@@ -46,7 +46,12 @@ class NativeVisualReviewRunner : Instrumentation() {
         try {
             val fixture = targetContext.filesDir.resolve("native-visual-fixture.json")
             val json = JSONObject(fixture.readText())
-            val returned = snapshot(json.getJSONObject("returned"))
+            // Labelled display-only switch-off readings so the review shows the new prompt; they are never sent or saved.
+            val returned = snapshot(json.getJSONObject("returned")).let { base -> base.copy(readings = base.readings + listOf(
+                VehicleReading("switchOff.light.lowBeam", "전조등", ReadStatus.AVAILABLE, "true", "켜짐", null, "UI 예시", base.completedAtMillis),
+                VehicleReading("switchOff.steeringWheelHeat", "핸들 열선", ReadStatus.AVAILABLE, "true", "2단계", null, "UI 예시", base.completedAtMillis),
+                VehicleReading("switchOff.light.cabin", "실내등", ReadStatus.AVAILABLE, "false", "꺼짐", null, "UI 예시", base.completedAtMillis),
+                VehicleReading("switchOff.turnSignal", "방향지시등", ReadStatus.AVAILABLE, "false", "꺼짐", null, "UI 예시", base.completedAtMillis))) }
             val stored = InspectionRecord("visual-only", snapshot(json.getJSONObject("pickup")), returned)
             activity = startActivitySync(Intent(targetContext, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as MainActivity
             val screen = activity
@@ -59,7 +64,7 @@ class NativeVisualReviewRunner : Instrumentation() {
             val active = InspectionUiState(current = returned, record = stored.copy(returned = null, submittedAtMillis = null, receiptId = null),
                 stage = InspectionStage.ACTIVE, serverConfigured = true,
                 pairedBooking = PairedBooking("visual-only", "RC-UI-PREVIEW", "시연 이용자", VehicleIdentity.vin(stored.pickup).orEmpty(), place), returnGuide = guide)
-            val states = listOf("active-light", "return-voice", "return-form", "pickup", "account", "active-compact-large-font", "active-night", "location-unavailable", "active-long-destination", "result")
+            val states = listOf("active-light", "return-voice", "return-form", "pickup", "account", "active-compact-large-font", "active-night", "location-unavailable", "active-long-destination", "result", "return-switch-off")
             states.forEach { name ->
                 val drawn = CountDownLatch(1)
                 // A fresh factory AVD may open Navigation during provisioning; resume this isolated review Activity before waiting for its Compose frame.
@@ -85,6 +90,8 @@ class NativeVisualReviewRunner : Instrumentation() {
                                                 when (name) {
                                                     "pickup" -> RentalCheckScreen(active.copy(stage = InspectionStage.PICKUP), {})
                                                     "return-form" -> RentalCheckScreen(active.copy(stage = InspectionStage.RETURN), {})
+                                                    "return-switch-off" -> RentalCheckScreen(active.copy(stage = InspectionStage.RETURN,
+                                                        returnSwitchOffDialog = kr.taeuk.pleos.rentalcheck.model.SwitchOffCheck.from(returned)), {})
                                                     "result" -> RentalCheckScreen(active.copy(stage = InspectionStage.RESULT,
                                                         record = stored.copy(submittedAtMillis = now, receiptId = "UI-PREVIEW")), {})
                                                     "location-unavailable" -> RentalCheckScreen(active.copy(returnGuide = guide.copy(fix = null,
@@ -116,7 +123,7 @@ class NativeVisualReviewRunner : Instrumentation() {
                 folder.resolve("$name.png").outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
                 bitmap.recycle()
             }
-            result.putString("visualReview", "captured ten labelled native layouts; no functional playback or navigation claim")
+            result.putString("visualReview", "captured eleven labelled native layouts; no functional playback or navigation claim")
         } catch (error: Exception) { code = Activity.RESULT_CANCELED; result.putString("visualReviewError", error.stackTraceToString()) }
         finally { activity?.let { runOnMainSync { it.finish() } } }
         finish(code, result)

@@ -21,6 +21,12 @@ import kr.taeuk.pleos.rentalcheck.model.VehicleReading
 import kr.taeuk.pleos.rentalcheck.model.VehicleSnapshot
 import kr.taeuk.pleos.rentalcheck.model.WindowPositionContract
 import kr.taeuk.pleos.rentalcheck.model.SeatOccupancy
+import kr.taeuk.pleos.rentalcheck.model.SwitchOffCheck
+import ai.pleos.playground.vehicle.api.model.area.MirrorArea
+import ai.pleos.playground.vehicle.constant.area.TurnSignalValue
+import ai.pleos.playground.vehicle.constant.control.LightState
+import ai.pleos.playground.vehicle.constant.control.WiperState
+import ai.pleos.playground.vehicle.constant.control.WiperSwitch
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
@@ -78,6 +84,7 @@ class PleosVehicleDataSource(context: Context) : VehicleDataSource, InteractionO
                 async { readSeatOccupancy() },
                 async { readTireThresholds() },
                 async { readWarnings() },
+                async { readSwitchOff() },
             ).awaitAll().flatten()
         }
         VehicleSnapshot(started, System.currentTimeMillis(), readings.sortedBy { it.key })
@@ -345,6 +352,173 @@ class PleosVehicleDataSource(context: Context) : VehicleDataSource, InteractionO
         )
     }
 
+    // Read lights, signals, wipers, defrosters and heaters that a renter may leave on; read-only, each item guarded, unsupported kept explicit.
+    private suspend fun readSwitchOff(): List<VehicleReading> = supervisorScope {
+        val light = vehicle.getLight()
+        listOf(
+            async { lightState("lowBeam", "전조등", { ok, fail -> light.checkLowBeamLightStateCapabilities({ c, _ -> ok(c) }, fail) },
+                { ok, fail -> light.getCurrentLowBeamLightState(ok, fail) }) },
+            async { lightState("highBeam", "상향등", { ok, fail -> light.checkHighBeamLightStateCapabilities({ c, _ -> ok(c) }, fail) },
+                { ok, fail -> light.getCurrentHighBeamLightState(ok, fail) }) },
+            async { lightState("frontFog", "앞 안개등", { ok, fail -> light.checkFrontFogLightStateCapabilities({ c, _ -> ok(c) }, fail) },
+                { ok, fail -> light.getCurrentFrontFogLightState(ok, fail) }) },
+            async { lightState("rearFog", "뒤 안개등", { ok, fail -> light.checkRearFogLightStateCapabilities({ c, _ -> ok(c) }, fail) },
+                { ok, fail -> light.getCurrentRearFogLightState(ok, fail) }) },
+            async { lightState("tailLamp", "미등", { ok, fail -> light.checkTailLampLightStateCapabilities({ c, _ -> ok(c) }, fail) },
+                { ok, fail -> light.getCurrentTailLampLightState(ok, fail) }) },
+            async { lightState("cabin", "실내등", { ok, fail -> light.checkCabinLightStateCapabilities({ c, _ -> ok(c) }, fail) },
+                { ok, fail -> light.getCurrentCabinLightState(ok, fail) }) },
+            async { readReadingLights() },
+            async { readTurnSignal() },
+            async { readWipers() },
+            async { readDefrosters() },
+            async { readSteeringHeat() },
+            async { readMirrorHeat() },
+        ).awaitAll().flatten()
+    }
+
+    // Convert one light state; daytime running lights switch off with the vehicle, so only a plain ON counts as left on.
+    private suspend fun lightState(
+        id: String, label: String, check: CapRequest,
+        get: ((LightState?) -> Unit, (Exception) -> Unit) -> Unit,
+    ): List<VehicleReading> {
+        val key = "${SwitchOffCheck.PREFIX}light.$id"
+        return guarded(key, label) {
+            ensureReadable(sdkAwait(request = check))
+            listOf(lightReading(key, label, sdkAwait<LightState?>(request = get)))
+        }
+    }
+
+    private fun lightReading(key: String, label: String, state: LightState?): VehicleReading = when (state) {
+        null -> unavailable(key, label, "SDK가 null을 반환했습니다.")
+        LightState.ON -> value(key, label, "true", "켜짐", detail = "LightState.ON")
+        LightState.OFF -> value(key, label, "false", "꺼짐", detail = "LightState.OFF")
+        LightState.DAYTIME_RUNNING -> value(key, label, "false", "주간주행등",
+            detail = "LightState.DAYTIME_RUNNING · 시동과 함께 꺼지는 표시로 보고 켜짐 항목에서 제외합니다.")
+        else -> unavailable(key, label, "알 수 없는 조명 상태: $state")
+    }
+
+    private suspend fun readReadingLights(): List<VehicleReading> = guarded("${SwitchOffCheck.PREFIX}light.reading", "독서등") {
+        val light = vehicle.getLight()
+        val (config, areas) = sdkAwait<Pair<CapabilityConfig, Map<SeatArea, List<LightState>>>> { ok, fail ->
+            light.checkReadingLightStateCapabilities({ c, map -> ok(c to map) }, fail)
+        }
+        ensureReadable(config); ensureAreas(areas.keys)
+        supervisorScope {
+            areas.keys.map { area -> async {
+                val names = area.values.map { it.name }
+                val key = "${SwitchOffCheck.PREFIX}light.reading.${names.sorted().joinToString("+")}"
+                val label = "${areaLabel(names)} 독서등"
+                guarded(key, label) { listOf(lightReading(key, label, sdkAwait<LightState?> { ok, fail -> light.getCurrentReadingLightState(area, ok, fail) })) }
+            } }.awaitAll().flatten()
+        }
+    }
+
+    // Any active left/right blink counts as left on; SDK 2.3.2 exposes no separate hazard getter.
+    private suspend fun readTurnSignal(): List<VehicleReading> {
+        val key = "${SwitchOffCheck.PREFIX}turnSignal"
+        return guarded(key, "방향지시등") {
+            val domain = vehicle.getTurnSignal()
+            ensureReadable(sdkAwait { ok, fail -> domain.checkTurnSignalStateCapabilities(ok, fail) })
+            val state = sdkAwait<TurnSignalValue?> { ok, fail -> domain.getCurrentTurnSignalState(ok, fail) }
+            listOf(when (state) {
+                null -> unavailable(key, "방향지시등", "SDK가 null을 반환했습니다.")
+                TurnSignalValue.OFF -> value(key, "방향지시등", "false", "꺼짐", detail = "TurnSignalValue.OFF")
+                TurnSignalValue.LEFT -> value(key, "방향지시등", "true", "왼쪽 깜빡임", detail = "TurnSignalValue.LEFT")
+                TurnSignalValue.RIGHT -> value(key, "방향지시등", "true", "오른쪽 깜빡임", detail = "TurnSignalValue.RIGHT")
+                else -> unavailable(key, "방향지시등", "알 수 없는 방향지시등 상태: $state")
+            })
+        }
+    }
+
+    // Combine the actual wiper state with its switch: running wipers or a manual speed left selected both count as on; AUTO and OFF do not.
+    private suspend fun readWipers(): List<VehicleReading> = guarded("${SwitchOffCheck.PREFIX}wiper", "와이퍼") {
+        val domain = vehicle.getWiper()
+        val (config, areas) = sdkAwait<Pair<CapabilityConfig, Map<WindowArea, List<WiperState>>>> { ok, fail ->
+            domain.checkWiperStateCapabilities({ c, map -> ok(c to map) }, fail)
+        }
+        ensureReadable(config); ensureAreas(areas.keys)
+        supervisorScope {
+            areas.keys.map { area -> async {
+                val names = area.values.map { it.name }
+                val key = "${SwitchOffCheck.PREFIX}wiper.${names.sorted().joinToString("+")}"
+                val label = "${areaLabel(names)} 와이퍼"
+                guarded(key, label) {
+                    val state = sdkAwait<WiperState?> { ok, fail -> domain.getCurrentWiperState(area, ok, fail) }
+                    // The switch is supplementary: its failure leaves the actual state decisive, but parent cancellation still propagates.
+                    val switch = try { sdkAwait<WiperSwitch?> { ok, fail -> domain.getCurrentWiperSwitch(area, ok, fail) } }
+                        catch (e: TimeoutCancellationException) { null } catch (e: CancellationException) { throw e } catch (e: Exception) { null }
+                    val manual = switch != null && switch != WiperSwitch.OFF && switch != WiperSwitch.AUTO &&
+                        switch != WiperSwitch.SERVICE && switch != WiperSwitch.OTHER
+                    val detail = "WiperState.${state?.name} · WiperSwitch.${switch?.name ?: "미수신"}"
+                    listOf(when {
+                        state == WiperState.ON || manual -> value(key, label, "true", if (state == WiperState.ON) "작동 중" else "수동 작동 위치", detail = detail)
+                        state == WiperState.OFF || state == WiperState.SERVICE -> value(key, label, "false",
+                            if (switch == WiperSwitch.AUTO) "자동" else "꺼짐", detail = detail)
+                        else -> unavailable(key, label, "와이퍼 상태를 판단할 수 없습니다. $detail")
+                    })
+                }
+            } }.awaitAll().flatten()
+        }
+    }
+
+    private suspend fun readDefrosters(): List<VehicleReading> = guarded("${SwitchOffCheck.PREFIX}defroster", "유리 열선") {
+        val hvac = vehicle.getHVAC()
+        val (config, areas) = sdkAwait<Pair<CapabilityConfig, List<WindowArea>>> { ok, fail ->
+            hvac.checkHvacDefrosterCapabilities({ c, list -> ok(c to list) }, fail)
+        }
+        ensureReadable(config); ensureAreas(areas)
+        supervisorScope {
+            areas.map { area -> async {
+                val names = area.values.map { it.name }
+                val key = "${SwitchOffCheck.PREFIX}defroster.${names.sorted().joinToString("+")}"
+                val label = "${areaLabel(names)} 열선"
+                guarded(key, label) {
+                    val on = sdkAwait<Boolean?> { ok, fail -> hvac.getHvacDefrosterState(area, ok, fail) }
+                    listOf(if (on == null) unavailable(key, label, "SDK가 null을 반환했습니다.")
+                        else value(key, label, on.toString(), if (on) "켜짐" else "꺼짐"))
+                }
+            } }.awaitAll().flatten()
+        }
+    }
+
+    // Heating levels are integers within the reported bounds: 0 is off, a positive level is on, anything else stays unknown.
+    private fun heatReading(key: String, label: String, level: Int?, bounds: AreaBounds<Int>): VehicleReading = when {
+        level == null -> unavailable(key, label, "SDK가 null을 반환했습니다.")
+        level !in bounds.minValue..bounds.maxValue -> unavailable(key, label, "지원 범위를 벗어난 값 $level (${bounds.minValue} ~ ${bounds.maxValue})")
+        level == 0 -> value(key, label, "false", "꺼짐", detail = "단계 0 / 지원 범위 ${bounds.minValue} ~ ${bounds.maxValue}")
+        level > 0 -> value(key, label, "true", "${level}단계", detail = "단계 $level / 지원 범위 ${bounds.minValue} ~ ${bounds.maxValue}")
+        else -> unavailable(key, label, "음수 단계 $level 의 의미를 확인할 수 없습니다.")
+    }
+
+    private suspend fun readSteeringHeat(): List<VehicleReading> {
+        val key = "${SwitchOffCheck.PREFIX}steeringWheelHeat"
+        return guarded(key, "핸들 열선") {
+            val wheel = vehicle.getSteeringWheel()
+            val (config, bounds) = sdkAwait<Pair<CapabilityConfig, AreaBounds<Int>>> { ok, fail ->
+                wheel.checkHvacSteeringWheelHeatCapabilities({ c, b -> ok(c to b) }, fail)
+            }
+            ensureReadable(config)
+            listOf(heatReading(key, "핸들 열선", sdkAwait<Int?> { ok, fail -> wheel.getHvacSteeringWheelHeatState(ok, fail) }, bounds))
+        }
+    }
+
+    private suspend fun readMirrorHeat(): List<VehicleReading> = guarded("${SwitchOffCheck.PREFIX}mirrorHeat", "사이드미러 열선") {
+        val mirror = vehicle.getSideMirror()
+        val (config, areas) = sdkAwait<Pair<CapabilityConfig, Map<MirrorArea, AreaBounds<Int>>>> { ok, fail ->
+            mirror.checkHvacSideMirrorHeatCapabilities({ c, map -> ok(c to map) }, fail)
+        }
+        ensureReadable(config); ensureAreas(areas.keys)
+        supervisorScope {
+            areas.entries.map { (area, bounds) -> async {
+                val names = area.values.map { it.name }
+                val key = "${SwitchOffCheck.PREFIX}mirrorHeat.${names.sorted().joinToString("+")}"
+                val label = "${areaLabel(names)} 사이드미러 열선"
+                guarded(key, label) { listOf(heatReading(key, label, sdkAwait<Int?> { ok, fail -> mirror.getHvacSideMirrorHeatState(area, ok, fail) }, bounds)) }
+            } }.awaitAll().flatten()
+        }
+    }
+
     private fun position(
         key: String, label: String, n: Int?, bounds: AreaBounds<Int>, isDoor: Boolean,
     ): VehicleReading {
@@ -389,9 +563,11 @@ class PleosVehicleDataSource(context: Context) : VehicleDataSource, InteractionO
         val permissionDenied = generateSequence<Throwable>(error) { it.cause }.any {
             it is SecurityException || it.message.orEmpty().contains("permission", ignoreCase = true)
         }
+        // For the switch-off items only, a property the service reports as unsupported is a missing feature, not an unknown state.
+        val unsupportedSwitch = key.startsWith(SwitchOffCheck.PREFIX) && error.message.orEmpty().contains("NOT_SUPPORTED_PROPERTY")
         val status = when {
             error is TimeoutCancellationException -> ReadStatus.TIMED_OUT
-            error is UnsupportedProperty -> ReadStatus.UNSUPPORTED
+            error is UnsupportedProperty || unsupportedSwitch -> ReadStatus.UNSUPPORTED
             permissionDenied -> ReadStatus.PERMISSION_DENIED
             else -> ReadStatus.ERROR
         }
@@ -440,6 +616,11 @@ class PleosVehicleDataSource(context: Context) : VehicleDataSource, InteractionO
                 "REAR" -> "트렁크"
                 "ROOF_TOP_1" -> "선루프 1"
                 "ROOF_TOP_2" -> "선루프 2"
+                "FRONT_WINDSHIELD" -> "앞 유리"
+                "REAR_WINDSHIELD" -> "뒷유리"
+                "DRIVER_LEFT" -> "왼쪽"
+                "DRIVER_RIGHT" -> "오른쪽"
+                "DRIVER_CENTER" -> "가운데"
                 else -> name
             }
         }

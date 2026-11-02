@@ -8,7 +8,8 @@ import kr.taeuk.pleos.rentalcheck.model.VehicleReading
 import kr.taeuk.pleos.rentalcheck.model.VehicleSnapshot
 
 internal enum class DetailGroup(val title: String) {
-    ENERGY("연료 · 배터리"), DOORS("문 개폐 · 잠금"), WINDOWS("창문 상태"), WARNINGS("수집된 경고등"), ALL("전체 수집 내역");
+    ENERGY("연료 · 배터리"), DOORS("문 개폐 · 잠금"), WINDOWS("창문 상태"), WARNINGS("수집된 경고등"),
+    SWITCH_OFF("조명 · 와이퍼 · 열선"), ALL("전체 수집 내역");
 
     fun readings(snapshot: VehicleSnapshot?): List<VehicleReading> = snapshot?.readings.orEmpty().filter {
         when (this) {
@@ -16,6 +17,7 @@ internal enum class DetailGroup(val title: String) {
             DOORS -> it.key.startsWith("door.") || it.key == "door" || it.key == "doorLock"
             WINDOWS -> it.key.startsWith("window.") || it.key == "window"
             WARNINGS -> it.key.startsWith("safety.") || it.key == "safety"
+            SWITCH_OFF -> it.key.startsWith(kr.taeuk.pleos.rentalcheck.model.SwitchOffCheck.PREFIX)
             ALL -> true
         }
     }

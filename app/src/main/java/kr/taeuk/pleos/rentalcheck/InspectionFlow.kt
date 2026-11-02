@@ -47,6 +47,11 @@ sealed interface InspectionEvent {
     data object ReplayReturnSeatSpeech : InspectionEvent
     data object StopReturnSeatSpeech : InspectionEvent
     data object ConfirmReturnWindowsManually : InspectionEvent
+    data object RetrySwitchOffCheck : InspectionEvent
+    data object ContinueWithSwitchOn : InspectionEvent
+    data object DismissSwitchOffCheck : InspectionEvent
+    data object ReplaySwitchOffSpeech : InspectionEvent
+    data object StopSwitchOffSpeech : InspectionEvent
     data object StartNewPickup : InspectionEvent
     data object SyncServer : InspectionEvent
     data object CreateAccountQr : InspectionEvent

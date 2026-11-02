@@ -9,6 +9,8 @@ import kr.taeuk.pleos.rentalcheck.model.InspectionRecord
 import kr.taeuk.pleos.rentalcheck.model.VehicleSnapshot
 import kr.taeuk.pleos.rentalcheck.model.VehicleIdentity
 import kr.taeuk.pleos.rentalcheck.model.ReturnWindowCheck
+import kr.taeuk.pleos.rentalcheck.model.SwitchOffCheck
+import kr.taeuk.pleos.rentalcheck.speech.SwitchOffSpeech
 import kr.taeuk.pleos.rentalcheck.model.SeatOccupancy
 import kr.taeuk.pleos.rentalcheck.speech.PleosSpeechEngine
 import kr.taeuk.pleos.rentalcheck.speech.ReturnSeatSpeech
@@ -36,6 +38,9 @@ data class InspectionUiState(
     val connectionDestination: InspectionStage = InspectionStage.PICKUP,
     val windowManuallyChecked: Boolean = false,
     val returnWindowDialog: ReturnWindowCheck? = null,
+    val returnSwitchOffDialog: SwitchOffCheck? = null,
+    val switchOffAcknowledged: String? = null,
+    val switchOffSpeech: SeatSpeechState = SeatSpeechState(),
     val returnOccupiedSeats: List<String> = emptyList(),
     val returnSeatSpeech: SeatSpeechState = SeatSpeechState(),
     val returnMemoNotice: Boolean = false,
@@ -96,6 +101,12 @@ class InspectionController(context: Context, recognitionEngine: LuggageRecogniti
         state = state.copy(arrivalSpeech = it)
         if (foreground) onChanged?.invoke(state)
     }
+    private val switchOffSpeech = SwitchOffSpeech(PleosSpeechEngine(context.applicationContext, scope)) {
+        // Playback status is presentation only; it cannot acknowledge the reminder or save the return.
+        state = state.copy(switchOffSpeech = it)
+        if (foreground) onChanged?.invoke(state)
+    }
+    private var spokenSwitchOff: String? = null
     private val returnSpeech = ReturnSeatSpeech(PleosSpeechEngine(context.applicationContext, scope)) {
         // Speech events update presentation only; they must not recursively retrigger automatic playback or mutate inspection evidence.
         state = state.copy(returnSeatSpeech = it)
@@ -153,6 +164,7 @@ class InspectionController(context: Context, recognitionEngine: LuggageRecogniti
         if (!stationaryReading) { stationaryJob?.cancel(); stationaryJob = null }
         returnGuide.stop()
         returnSpeech.stop()
+        switchOffSpeech.stop()
         assistance.stop()
         pairingPoll?.cancel()
         onChanged = null
@@ -173,7 +185,8 @@ class InspectionController(context: Context, recognitionEngine: LuggageRecogniti
         // Keep navigation and storage behind the paired-account guards; only disconnected emulator setup may change test identity.
         val voiceControl = event in listOf(InspectionEvent.DismissReturnSeatNotice, InspectionEvent.StopReturnSeatSpeech,
             InspectionEvent.ReplayReturnSeatSpeech, InspectionEvent.CloseVoiceMemo, InspectionEvent.StopVoiceRecognition,
-            InspectionEvent.DismissArrivalPrompt, InspectionEvent.StopArrivalSpeech)
+            InspectionEvent.DismissArrivalPrompt, InspectionEvent.StopArrivalSpeech, InspectionEvent.StopSwitchOffSpeech,
+            InspectionEvent.DismissSwitchOffCheck)
         if ((!voiceControl && (state.busy || state.cloudBusy || state.accountBusy)) || disposing) return
         if (state.pairedBooking == null && event !in listOf(InspectionEvent.Refresh,
                 InspectionEvent.CreateAccountQr, InspectionEvent.CheckAccountConnection,
@@ -227,12 +240,33 @@ class InspectionController(context: Context, recognitionEngine: LuggageRecogniti
             InspectionEvent.BeginReturn -> if (state.record != null && state.record?.returned == null) {
                 voiceMemo.close(); arrival.dismiss(); arrivalSpeech.stop()
                 returnSpeech.newAttempt()
-                state = state.copy(stage = InspectionStage.RETURN, windowManuallyChecked = false, errorMessage = null)
+                spokenSwitchOff = null
+                state = state.copy(stage = InspectionStage.RETURN, windowManuallyChecked = false, errorMessage = null,
+                    switchOffAcknowledged = null, returnSwitchOffDialog = null)
                 refresh()
             }
             InspectionEvent.RetryReturnWindowCheck -> if (state.stage == InspectionStage.RETURN && state.returnWindowDialog != null) {
                 if (state.retryReturnSave) captureReturn() else refresh()
             }
+            InspectionEvent.RetrySwitchOffCheck -> if (state.stage == InspectionStage.RETURN && state.returnSwitchOffDialog != null) {
+                switchOffSpeech.stop()
+                if (state.retryReturnSave) captureReturn() else refresh()
+            }
+            InspectionEvent.ContinueWithSwitchOn -> if (state.stage == InspectionStage.RETURN) state.returnSwitchOffDialog?.let { check ->
+                // The renter explicitly accepts this exact set; a different item switched on later prompts again.
+                switchOffSpeech.stop()
+                val save = state.retryReturnSave
+                state = state.copy(switchOffAcknowledged = check.signature, returnSwitchOffDialog = null)
+                if (save) captureReturn() else publish()
+            }
+            InspectionEvent.DismissSwitchOffCheck -> {
+                switchOffSpeech.stop()
+                state = state.copy(returnSwitchOffDialog = null)
+                publish()
+            }
+            InspectionEvent.ReplaySwitchOffSpeech -> state.returnSwitchOffDialog?.takeIf { foreground && state.stage == InspectionStage.RETURN }
+                ?.let { switchOffSpeech.play(SwitchOffCheck.spokenReminder(it.leftOn)) }
+            InspectionEvent.StopSwitchOffSpeech -> switchOffSpeech.stop()
             InspectionEvent.DismissReturnWindowCheck -> {
                 state = state.copy(returnWindowDialog = null)
                 publish()
@@ -269,7 +303,7 @@ class InspectionController(context: Context, recognitionEngine: LuggageRecogniti
             InspectionEvent.Back -> {
                 val record = state.record
                 state = state.copy(stage = record?.let(InspectionStage::afterSave) ?: InspectionStage.CONNECT, errorMessage = null,
-                    returnWindowDialog = null, returnOccupiedSeats = emptyList(), returnMemoNotice = false,
+                    returnWindowDialog = null, returnSwitchOffDialog = null, returnOccupiedSeats = emptyList(), returnMemoNotice = false,
                     windowManuallyChecked = if (record?.returned != null) record.returnWindowManuallyChecked
                         else record?.pickupWindowManuallyChecked ?: false)
                 publish()
@@ -300,7 +334,8 @@ class InspectionController(context: Context, recognitionEngine: LuggageRecogniti
         if (action == CaptureAction.RETURN && state.record == null) return
         val manuallyChecked = state.windowManuallyChecked
         var saved = false
-        state = state.copy(busy = true, errorMessage = null, returnWindowDialog = null, returnOccupiedSeats = emptyList(),
+        switchOffSpeech.stop(); spokenSwitchOff = null
+        state = state.copy(busy = true, errorMessage = null, returnWindowDialog = null, returnSwitchOffDialog = null, returnOccupiedSeats = emptyList(),
             message = "차량에서 현재 상태를 조회하고 있습니다.")
         publish()
         readJob = scope.launch {
@@ -329,6 +364,13 @@ class InspectionController(context: Context, recognitionEngine: LuggageRecogniti
                         state = state.copy(returnWindowDialog = windows, retryReturnSave = action == CaptureAction.RETURN,
                             message = if (windows.openWindows.isNotEmpty()) "반납 전에 열린 창문을 닫아 주세요."
                                 else "창문 상태를 확인하지 못했어요. 직접 닫힘을 확인해 주세요.")
+                        if (action == CaptureAction.RETURN) return@launch
+                    }
+                    // Windows keep priority; then remind about lights, signals, wipers and heaters still on, without blocking a confirmed choice.
+                    val switches = SwitchOffCheck.from(snapshot)
+                    if (state.returnWindowDialog == null && switches.needsPrompt(state.switchOffAcknowledged)) {
+                        state = state.copy(returnSwitchOffDialog = switches, retryReturnSave = action == CaptureAction.RETURN,
+                            message = "내리기 전에 켜져 있는 항목을 확인해 주세요.")
                         if (action == CaptureAction.RETURN) return@launch
                     }
                 }
@@ -385,7 +427,7 @@ class InspectionController(context: Context, recognitionEngine: LuggageRecogniti
                 state = state.copy(serverConfigured = true, serverUrl = serverConfig.baseUrl,
                     cloudSummary = null, photoLink = null,
                     pairing = null, pairedBooking = null, resultVisible = false,
-                    returnWindowDialog = null, returnOccupiedSeats = emptyList(),
+                    returnWindowDialog = null, returnSwitchOffDialog = null, returnOccupiedSeats = emptyList(),
                     cloudMessage = "서버 설정을 저장했어요. 기록 전송으로 연결을 확인해 주세요.")
             } catch (e: Exception) {
                 state = state.copy(cloudError = e.message?.take(240) ?: "서버 설정을 저장하지 못했어요.")
@@ -525,7 +567,7 @@ class InspectionController(context: Context, recognitionEngine: LuggageRecogniti
                 pairingPreferences.edit().remove("id").apply()
                 pairingId = null
                 state = state.copy(record = retained, pairedBooking = null, pairing = null, resultVisible = false,
-                    returnWindowDialog = null, returnOccupiedSeats = emptyList(),
+                    returnWindowDialog = null, returnSwitchOffDialog = null, returnOccupiedSeats = emptyList(),
                     cloudSummary = null, photoLink = null, stage = InspectionStage.CONNECT,
                     connectionDestination = retained?.let(InspectionStage::afterSave) ?: InspectionStage.PICKUP, windowManuallyChecked = false,
                     accountMessage = if (retained == null) "차량 연결을 해제했어요. 내 기록은 휴대전화 계정에서 확인할 수 있어요."
@@ -579,7 +621,7 @@ class InspectionController(context: Context, recognitionEngine: LuggageRecogniti
     private fun canSpeakReturnNotice(): Boolean = foreground && !disposing && !state.busy && state.pairedBooking != null &&
         state.record?.bookingId == state.pairedBooking?.id && VehicleIdentity.vin(state.current) == state.pairedBooking?.vin &&
         state.stage in listOf(InspectionStage.RETURN, InspectionStage.EVIDENCE) && state.returnWindowDialog == null &&
-        (state.returnOccupiedSeats.isNotEmpty() || state.returnMemoNotice) && ReturnWindowCheck.from(state.current).canSave(state.windowManuallyChecked)
+        state.returnSwitchOffDialog == null && (state.returnOccupiedSeats.isNotEmpty() || state.returnMemoNotice) && ReturnWindowCheck.from(state.current).canSave(state.windowManuallyChecked)
 
     // Restrict notes to an authorized unreturned rental; a return form or saved return cannot edit the luggage history.
     private fun memoEditable(): Boolean = foreground && !disposing && state.pairedBooking != null &&
@@ -663,6 +705,12 @@ class InspectionController(context: Context, recognitionEngine: LuggageRecogniti
             if (guideEnabled) state.pairedBooking?.returnLocation else null)
         val identity = state.record?.let { serverConfig.baseUrl + "|" + it.bookingId + "|" + it.id }
         updateArrival()
+        val switchOff = state.returnSwitchOffDialog
+        if (switchOff != null && foreground && !disposing && !state.busy && state.stage == InspectionStage.RETURN &&
+            switchOff.signature != spokenSwitchOff) {
+            spokenSwitchOff = switchOff.signature
+            switchOffSpeech.play(SwitchOffCheck.spokenReminder(switchOff.leftOn))
+        }
         returnSpeech.update(identity, state.returnOccupiedSeats, canSpeakReturnNotice(),
             if (state.returnMemoNotice) state.assistance.memory.luggageMemos else emptyList())
         if (foreground) onChanged?.invoke(state)

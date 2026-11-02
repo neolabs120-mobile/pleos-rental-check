@@ -117,7 +117,10 @@ fun RentalCheckScreen(state: InspectionUiState, onEvent: (InspectionEvent) -> Un
                             left = {
                                 AttentionCard(state, snapshot, openDetail)
                                 EnergyCard(snapshot, state.record?.pickup, onClick = { openDetail(DetailGroup.ENERGY) })
-                            }, right = { VehicleCard(snapshot, state.windowManuallyChecked, openDetail, showReturnCheck = true) })
+                            }, right = {
+                                VehicleCard(snapshot, state.windowManuallyChecked, openDetail, showReturnCheck = true)
+                                SwitchOffCard(snapshot, openDetail)
+                            })
                         InspectionStage.RESULT -> ResultContent(state, wide, expandedResult, openDetail)
                         InspectionStage.EVIDENCE -> EvidenceContent(state, wide, onEvent)
                     }
@@ -165,9 +168,11 @@ fun RentalCheckScreen(state: InspectionUiState, onEvent: (InspectionEvent) -> Un
         })
     if (state.stage == InspectionStage.RETURN && !state.busy) {
         state.returnWindowDialog?.let { ReturnWindowDialog(it, onEvent) }
+        if (state.returnWindowDialog == null) state.returnSwitchOffDialog?.let { ReturnSwitchOffDialog(it, state.switchOffSpeech, onEvent) }
     }
     if (state.stage in listOf(InspectionStage.RETURN, InspectionStage.EVIDENCE) && !state.busy &&
-        state.returnWindowDialog == null && (state.returnOccupiedSeats.isNotEmpty() || state.returnMemoNotice)) {
+        state.returnWindowDialog == null && state.returnSwitchOffDialog == null &&
+        (state.returnOccupiedSeats.isNotEmpty() || state.returnMemoNotice)) {
         ReturnSeatNotice(state.returnOccupiedSeats, state.returnSeatSpeech, onEvent,
             if (state.returnMemoNotice) state.assistance.memory.luggageMemos else emptyList(),
             state.assistance.memory.collectedSpaces, state.stage == InspectionStage.RETURN)
@@ -473,6 +478,30 @@ private fun CarSilhouette() {
         }
         Text("앞", modifier = Modifier.padding(top = 10.dp), style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+// Summarize the newest switch-off review on the return form; the row opens every raw light, wiper and heater reading.
+@Composable
+private fun SwitchOffCard(snapshot: VehicleSnapshot?, open: (DetailGroup) -> Unit) {
+    val check = SwitchOffCheck.from(snapshot)
+    Panel {
+        PanelTitle("끄고 내리기", "조명 · 와이퍼 · 열선")
+        StatusRow(when {
+            check.leftOn.isNotEmpty() -> "켜져 있는 항목 ${check.leftOn.size}개"
+            check.offCount > 0 -> "조회한 ${check.offCount}개 항목 · 모두 꺼짐"
+            else -> "차량에서 확인한 항목이 없어요"
+        }, when {
+            check.leftOn.isNotEmpty() -> check.leftOn.joinToString { "${it.label} ${it.state}" }
+            check.unknown.isNotEmpty() -> "확인하지 못한 항목: " + check.unknown.joinToString()
+            check.offCount > 0 -> "마지막 조회 결과예요. 반납 점검 저장 시 다시 조회해요."
+            else -> "조명·와이퍼·열선을 직접 확인해 주세요."
+        }, attention = check.leftOn.isNotEmpty() || check.offCount == 0, onClick = { open(DetailGroup.SWITCH_OFF) })
+        if (check.leftOn.isNotEmpty() && check.unknown.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp)); Muted("확인하지 못한 항목: " + check.unknown.joinToString())
+        }
+        Spacer(Modifier.height(8.dp))
+        Muted("앱은 차량을 조작하지 않아요. 켜져 있으면 직접 꺼 주세요.")
     }
 }
 
