@@ -1,6 +1,13 @@
 package kr.taeuk.pleos.rentalcheck.ui
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
@@ -32,22 +39,28 @@ internal fun ReturnSeatNotice(seats: List<String>, speech: SeatSpeechState, onEv
                 Spacer(Modifier.height(12.dp))
                 Text("${memos.count { it.space in collected }}/${memos.size}개 챙김 확인", style = MaterialTheme.typography.titleMedium)
                 for (memo in memos) {
-                    androidx.compose.material3.Checkbox(checked = memo.space in collected,
-                        onCheckedChange = if (editable) { checked -> onEvent(InspectionEvent.CollectLuggage(memo.space, checked)) } else null)
-                    Text(memo.space.label + " · " + memo.item + if (memo.space in collected) " · 챙겼어요" else " · 직접 살펴봐 주세요")
+                    // Keep each checkbox on the same line as the item it confirms so the list reads as a checklist.
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        androidx.compose.material3.Checkbox(checked = memo.space in collected,
+                            onCheckedChange = if (editable) { checked -> onEvent(InspectionEvent.CollectLuggage(memo.space, checked)) } else null)
+                        Text(memo.space.label + " · " + memo.item + if (memo.space in collected) " · 챙겼어요" else " · 직접 살펴봐 주세요",
+                            style = MaterialTheme.typography.bodyLarge)
+                    }
                 }
                 if (!editable) Text("남은 항목은 휴대폰 사진·확인 화면에서 이어서 확인해 주세요.")
                 Spacer(Modifier.height(12.dp))
             }
             if (seats.isNotEmpty()) StateBadge("점유 신호가 있는 좌석", attention = true)
             Spacer(Modifier.height(12.dp))
-            Text(seats.joinToString(), style = MaterialTheme.typography.titleLarge)
+            Text(seats.joinToString(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(12.dp))
             Text("해당 좌석과 발밑에 두고 내리는 물건이 없는지 살펴봐 주세요.")
             Spacer(Modifier.height(12.dp))
             Text("사람과 짐은 구분하지 못해요. 비점유 좌석·트렁크 등 다른 공간도 직접 확인해 주세요.")
             val playing = speech.status in listOf(SeatSpeechStatus.PREPARING, SeatSpeechStatus.SPEAKING)
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(16.dp))
             Text(when (speech.status) {
                 SeatSpeechStatus.PREPARING -> "음성 안내를 준비하고 있어요."
                 SeatSpeechStatus.SPEAKING -> "소지품 안내를 읽고 있어요."
@@ -55,11 +68,15 @@ internal fun ReturnSeatNotice(seats: List<String>, speech: SeatSpeechState, onEv
                 SeatSpeechStatus.STOPPED -> "음성 안내를 중지했어요."
                 SeatSpeechStatus.FAILED -> "음성 안내를 재생하지 못했어요. 화면을 확인해 주세요."
                 SeatSpeechStatus.IDLE -> "필요하면 음성 안내를 들어보세요."
-            })
-            FilledTonalButton(onClick = { onEvent(if (playing) InspectionEvent.StopReturnSeatSpeech else InspectionEvent.ReplayReturnSeatSpeech) }) {
-                Text(if (playing) "음성 중지" else "음성 다시 듣기")
+            }, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(8.dp))
+            FilledTonalButton(onClick = { onEvent(if (playing) InspectionEvent.StopReturnSeatSpeech else InspectionEvent.ReplayReturnSeatSpeech) },
+                modifier = Modifier.heightIn(min = 52.dp)) {
+                Text(if (playing) "■  음성 중지" else "▶  음성 다시 듣기")
             }
         } },
-        confirmButton = { TextButton(onClick = { onEvent(InspectionEvent.DismissReturnSeatNotice) }) { Text("안내 확인") } },
+        confirmButton = { Button(onClick = { onEvent(InspectionEvent.DismissReturnSeatNotice) },
+            modifier = Modifier.heightIn(min = 52.dp).widthIn(min = 160.dp)) { Text("안내 확인") } },
+        shape = RoundedCornerShape(28.dp),
     )
 }

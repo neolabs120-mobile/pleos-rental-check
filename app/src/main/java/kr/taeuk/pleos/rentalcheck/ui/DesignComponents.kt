@@ -1,7 +1,9 @@
 package kr.taeuk.pleos.rentalcheck.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -46,16 +48,25 @@ internal fun JourneyProgress(current: InspectionStage) {
                 Text("계정 연결부터 반납 기록까지", style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
             }
-        } else Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        } else Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            val colors = MaterialTheme.colorScheme
             InspectionStage.entries.forEachIndexed { index, stage ->
                 val selected = stage == current
-                Surface(Modifier.weight(1f), shape = RoundedCornerShape(10.dp),
-                    color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow) {
-                    Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("0${index + 1}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                        Text(stage.title, style = MaterialTheme.typography.labelMedium,
-                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                            color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)
+                val done = stage.ordinal < current.ordinal
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // A thin track above each label reads as one continuous journey: filled up to the current step, muted ahead.
+                    Box(Modifier.fillMaxWidth().height(4.dp).background(
+                        if (done || selected) colors.primary else colors.outlineVariant, RoundedCornerShape(50)))
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Surface(shape = CircleShape, color = when { selected -> colors.primary; done -> colors.primaryContainer; else -> colors.surfaceContainerHighest }) {
+                            Box(Modifier.size(26.dp), contentAlignment = Alignment.Center) {
+                                Text(if (done) "✓" else "${index + 1}", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold,
+                                    color = when { selected -> colors.onPrimary; done -> colors.primary; else -> colors.onSurfaceVariant })
+                            }
+                        }
+                        Text(stage.title, style = MaterialTheme.typography.labelMedium, maxLines = 1,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                            color = when { selected -> colors.onSurface; done -> colors.primary; else -> colors.onSurfaceVariant })
                     }
                 }
             }

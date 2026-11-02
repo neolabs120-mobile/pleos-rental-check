@@ -6,6 +6,7 @@ import 'data/session_store.dart';
 import 'screens/home_screen.dart';
 import 'screens/welcome_screen.dart';
 import 'state/rental_controller.dart';
+import 'ui/app_theme.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,48 +42,7 @@ class _RentalCheckAppState extends State<RentalCheckApp> {
   }
 
   ThemeData theme(Brightness brightness) {
-    final colors = ColorScheme.fromSeed(
-      seedColor: const Color(0xFF087F78),
-      brightness: brightness,
-    );
-    return ThemeData(
-      useMaterial3: true,
-      colorScheme: colors,
-      scaffoldBackgroundColor: brightness == Brightness.light
-          ? const Color(0xFFF5F8F7)
-          : const Color(0xFF111B1A),
-      appBarTheme: const AppBarTheme(
-        centerTitle: false,
-        scrolledUnderElevation: 0,
-      ),
-      cardTheme: CardThemeData(
-        elevation: 0,
-        color: colors.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(22),
-          side: BorderSide(color: colors.outlineVariant),
-        ),
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: colors.surface,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-      ),
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
-          ),
-        ),
-      ),
-      outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
-          ),
-        ),
-      ),
-    );
+    return rentalTheme(brightness);
   }
 
   @override

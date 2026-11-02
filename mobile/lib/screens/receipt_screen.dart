@@ -16,10 +16,21 @@ class ReceiptScreen extends StatelessWidget {
   Widget build(BuildContext context) => AppPage(
     title: '제출 결과',
     children: [
-      Icon(
-        Icons.check_circle_rounded,
-        size: 92,
-        color: Theme.of(context).colorScheme.primary,
+      Align(
+        alignment: Alignment.centerLeft,
+        child: Container(
+          width: 76,
+          height: 76,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primaryContainer,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            Icons.check_rounded,
+            size: 44,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+        ),
       ),
       const Intro('점검 기록을 제출했어요', '서버에 접수된 기록은 내 점검 기록에서 다시 확인할 수 있어요.'),
       if (usesTestVin)
@@ -28,11 +39,45 @@ class ReceiptScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('접수 번호'),
-            const SizedBox(height: 10),
-            SelectableText(receipt['receiptId'] as String),
-            const SizedBox(height: 20),
-            Text('접수 시각 ${dateLabel(millis(receipt['submittedAtMillis']))}'),
+            Text(
+              '접수 번호',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 8),
+            // Keep the full server receipt identifier selectable, set in a tinted well so it reads as the key result.
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainer,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: SelectableText(
+                receipt['receiptId'] as String,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Divider(height: 1),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Icon(
+                  Icons.schedule_rounded,
+                  size: 18,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '접수 시각 ${dateLabel(millis(receipt['submittedAtMillis']))}',
+                ),
+              ],
+            ),
           ],
         ),
       ),

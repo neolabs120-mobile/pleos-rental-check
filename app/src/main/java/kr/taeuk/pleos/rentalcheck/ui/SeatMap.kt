@@ -48,12 +48,12 @@ private fun SeatTile(label: String, reading: VehicleReading) {
         else -> null
     }
     val colors = MaterialTheme.colorScheme
-    val fill = when (occupied) { true -> colors.errorContainer; false -> colors.surfaceVariant; null -> colors.surface }
+    val fill = when (occupied) { true -> colors.errorContainer; false -> colors.surfaceContainerLow; null -> colors.surface }
     val ink = if (occupied == true) colors.onErrorContainer else colors.onSurfaceVariant
-    Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), color = fill,
-        border = BorderStroke(1.dp, if (occupied == true) colors.error.copy(alpha = .4f) else colors.outlineVariant)) {
-        Column(Modifier.padding(horizontal = 10.dp, vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), color = fill,
+        border = BorderStroke(if (occupied == true) 2.dp else 1.dp, if (occupied == true) colors.error.copy(alpha = .6f) else colors.outlineVariant)) {
+        Column(Modifier.padding(horizontal = 10.dp, vertical = 14.dp), horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp)) {
             SeatGlyph(ink)
             Text(label, style = MaterialTheme.typography.labelMedium, color = ink)
             Text(when (occupied) { true -> "점유"; false -> "비점유"; null -> valueText(reading) },
@@ -65,7 +65,7 @@ private fun SeatTile(label: String, reading: VehicleReading) {
 // Draw a quiet seat silhouette as a code-native visual cue, keeping the textual state available to accessibility services.
 @Composable
 private fun SeatGlyph(color: Color) {
-    Canvas(Modifier.size(30.dp)) {
+    Canvas(Modifier.size(34.dp)) {
         val w = size.width; val h = size.height
         drawRoundRect(color.copy(alpha = .8f), Offset(w * .22f, h * .08f), Size(w * .56f, h * .58f), CornerRadius(4.dp.toPx()))
         drawRoundRect(color, Offset(w * .15f, h * .68f), Size(w * .7f, h * .22f), CornerRadius(3.dp.toPx()))

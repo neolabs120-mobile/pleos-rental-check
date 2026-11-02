@@ -108,7 +108,10 @@ class Intro extends StatelessWidget {
       const SizedBox(height: 12),
       Text(
         subtitle,
-        style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.6),
+        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+          height: 1.6,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
       ),
     ],
   );
@@ -124,21 +127,30 @@ class Notice extends StatelessWidget {
     return Semantics(
       liveRegion: true,
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(14, 14, 16, 14),
         decoration: BoxDecoration(
           color: isError ? colors.errorContainer : colors.secondaryContainer,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(
-              isError ? Icons.error_outline : Icons.info_outline,
-              color: isError
-                  ? colors.onErrorContainer
-                  : colors.onSecondaryContainer,
+            // A soft round badge keeps the icon legible on both notice tones without adding another border.
+            Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                color: (isError ? colors.onErrorContainer : colors.primary)
+                    .withValues(alpha: .12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                isError ? Icons.error_outline : Icons.info_outline,
+                size: 18,
+                color: isError ? colors.onErrorContainer : colors.primary,
+              ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
             Expanded(
               child: Text(
                 text,

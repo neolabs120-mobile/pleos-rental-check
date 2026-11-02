@@ -9,6 +9,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kr.taeuk.pleos.rentalcheck.InspectionEvent
@@ -31,7 +32,7 @@ internal fun ReturnLocationCard(state: InspectionUiState, onEvent: (InspectionEv
                 val description: @Composable () -> Unit = {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         if (place.isTest) StateBadge("시험 장소 · 실제 반납 거점 아님", true)
-                        Text(place.name, style = MaterialTheme.typography.titleLarge)
+                        Text(place.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         Text(place.address, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (place.instructions.isNotBlank()) Text(place.instructions, style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -83,21 +84,22 @@ internal fun ReturnLocationCard(state: InspectionUiState, onEvent: (InspectionEv
             Text("최근 1분 이내 차량 위치로 직선거리를 계산해요. 주행 거리나 주차구역 도착을 확인하는 값이 아니며 자동 반납하지 않아요.")
             Text("차량 위치는 이 앱이 화면에 열려 있는 동안만 사용하며 서버에 보내거나 반납 기록에 저장하지 않아요.")
         }
-    }, confirmButton = { TextButton(onClick = { details = false }, modifier = Modifier.heightIn(min = 52.dp)) { Text("확인") } })
+    }, confirmButton = { Button(onClick = { details = false }, modifier = Modifier.heightIn(min = 52.dp).widthIn(min = 140.dp)) { Text("확인") } },
+        shape = RoundedCornerShape(28.dp))
 }
 
 // Reserve prominent numerals for the estimate; unavailable location cannot be mistaken for zero distance or verified arrival.
 @Composable
 private fun ReturnDistance(distance: Double?) {
-    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
-        Column(Modifier.widthIn(min = 160.dp).padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("현재 직선거리", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+        Column(Modifier.widthIn(min = 180.dp).padding(horizontal = 24.dp, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("현재 직선거리", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
             Text(when {
                 distance == null -> "확인 불가"
                 distance < 1000 -> "약 ${distance.toInt()} m"
                 else -> "약 ${String.format(Locale.KOREA, "%.1f", distance / 1000)} km"
-            }, style = if (distance == null) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.primary)
+            }, style = if (distance == null) MaterialTheme.typography.titleLarge else MaterialTheme.typography.displaySmall,
+                fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
         }
     }
 }

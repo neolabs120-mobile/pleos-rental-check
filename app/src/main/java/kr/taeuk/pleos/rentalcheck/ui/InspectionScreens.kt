@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,6 +20,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kr.taeuk.pleos.rentalcheck.InspectionEvent
@@ -127,8 +129,11 @@ fun RentalCheckScreen(state: InspectionUiState, onEvent: (InspectionEvent) -> Un
                 } }
                 item("platform") { ContentWidth {
                     if (state.stage == InspectionStage.ACTIVE) {
-                        OutlinedButton(onClick = { extrasExpanded = !extrasExpanded }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-                            shape = RoundedCornerShape(14.dp)) { Text(if (extrasExpanded) "사진 · 차량 연습 · 전송 상태 접기  −" else "사진 · 차량 연습 · 전송 상태  ＋") }
+                        FilledTonalButton(onClick = { extrasExpanded = !extrasExpanded }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                            shape = RoundedCornerShape(18.dp), colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest)) {
+                            Text(if (extrasExpanded) "사진 · 차량 연습 · 전송 상태 접기  −" else "사진 · 차량 연습 · 전송 상태  ＋")
+                        }
                         if (extrasExpanded) Column(Modifier.padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                             TwoColumns(wide, left = { FamiliarizationCard(state, onEvent) },
                                 right = { CloudStatusCard(state, onEvent, onSettings = { showSettings = true }) })
@@ -202,9 +207,13 @@ private fun AppHeader(state: InspectionUiState, onEvent: (InspectionEvent) -> Un
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         RentalBrand()
                         if (!compact) {
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Box(Modifier.width(1.dp).height(28.dp).background(MaterialTheme.colorScheme.outlineVariant))
                                 Text("차량 연결 · 정차 후 이용", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                state.pairedBooking?.let { Text("예약 ${it.number}", style = MaterialTheme.typography.bodySmall) }
+                                state.pairedBooking?.let { Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.surfaceContainer) {
+                                    Text("예약 ${it.number}", Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
+                                        style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                                } }
                             }
                             actions()
                         }
@@ -229,8 +238,8 @@ private fun ScreenHeading(state: InspectionUiState) {
         InspectionStage.EVIDENCE -> "사진과 직접 확인 내역을 보내 주세요" to "휴대전화에서 창문·소지품·외관 사진을 첨부하고 확인 내용을 전송해요."
         InspectionStage.RESULT -> "점검 기록을 서버에 제출했어요" to "인수 ${inspectionTime(state.record?.pickup?.completedAtMillis ?: 0)} → 반납 점검 ${inspectionTime(state.record?.returned?.completedAtMillis ?: 0)}"
     }
-    Column(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(title, style = MaterialTheme.typography.headlineSmall)
+    Column(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Text(description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
@@ -597,21 +606,24 @@ internal fun TwoColumns(wide: Boolean, left: @Composable ColumnScope.() -> Unit,
 // Group related readings with a quiet border and restrained padding so the limited automotive app area carries useful information.
 @Composable
 internal fun Panel(content: @Composable ColumnScope.() -> Unit) {
-    Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .7f))) {
+    Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .55f)), shadowElevation = 1.dp) {
         Column(Modifier.padding(24.dp), content = content)
     }
 }
 
-// Give each card a compact title row while allowing its genuine timestamp or saved-state caption to remain visible.
+// Give each card a compact title row with a small brand accent while allowing its genuine timestamp or saved-state caption to remain visible.
 @Composable
 internal fun PanelTitle(title: String, aside: String? = null) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-        if (aside != null) Text(aside, style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 8.dp))
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.width(4.dp).height(20.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(50)))
+        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+        if (aside != null) Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.surfaceContainer) {
+            Text(aside, Modifier.padding(horizontal = 10.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
-    Spacer(Modifier.height(12.dp))
+    Spacer(Modifier.height(14.dp))
 }
 
 @Composable
@@ -623,36 +635,51 @@ private fun Metric(label: String, value: String) {
 
 @Composable
 internal fun SmallComparison(label: String, value: String) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+    Column {
+        Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.End)
+        }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .5f))
     }
 }
 
+// Pair every status with a round glyph so attention and confirmed rows are distinguishable by shape as well as by color.
 @Composable
 private fun StatusRow(title: String, description: String, attention: Boolean = false, onClick: () -> Unit) {
-    Surface(onClick = onClick, shape = RoundedCornerShape(10.dp),
-        color = if (attention) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer) {
-        Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text(title, style = MaterialTheme.typography.titleSmall,
-                    color = if (attention) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer)
-                Text(description, style = MaterialTheme.typography.bodySmall,
-                    color = if (attention) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer)
+    val colors = MaterialTheme.colorScheme
+    val ink = if (attention) colors.onErrorContainer else colors.onPrimaryContainer
+    Surface(onClick = onClick, shape = RoundedCornerShape(16.dp),
+        color = if (attention) colors.errorContainer else colors.primaryContainer) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Surface(shape = CircleShape, color = if (attention) colors.error else colors.primary) {
+                Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) {
+                    Text(if (attention) "!" else "✓", style = MaterialTheme.typography.labelLarge,
+                        color = if (attention) colors.errorContainer else colors.onPrimary)
+                }
             }
-            Text("›", style = MaterialTheme.typography.titleLarge)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = ink)
+                Text(description, style = MaterialTheme.typography.bodySmall, color = ink.copy(alpha = .85f))
+            }
+            Text("›", style = MaterialTheme.typography.titleLarge, color = ink)
         }
     }
 }
 
 @Composable
 private fun Notice(title: String, message: String, error: Boolean = false) {
-    Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
-        color = if (error) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceVariant) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-            Text(title, style = MaterialTheme.typography.titleSmall)
-            Text(message, style = MaterialTheme.typography.bodySmall)
+    val colors = MaterialTheme.colorScheme
+    Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp),
+        color = if (error) colors.errorContainer else colors.surfaceVariant) {
+        Row(Modifier.height(IntrinsicSize.Min)) {
+            Box(Modifier.width(5.dp).fillMaxHeight().background(if (error) colors.error else colors.primary))
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Text(message, style = MaterialTheme.typography.bodySmall)
+            }
         }
     }
 }
