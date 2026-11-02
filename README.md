@@ -1,61 +1,69 @@
 # 렌트체크
 
-## 차량 0.2.9 · 정돈한 차량 화면
+처음 빌린 차를 반납할 때는 차량 상태도 확인하고 짐도 챙겨야 합니다. 렌트체크는 이 과정을 차량 화면과 휴대폰에서 이어서 진행하는 카셰어링 이용자용 앱입니다.
 
-글꼴·크기·카드 간격을 통일했습니다. 왼쪽 반납 장소·직선거리·이용 요약, 오른쪽 좌석·짐 메모 순서로 확인합니다. 사진·차량 연습·전송은 보조 영역에서 열며 하단 반납 버튼은 고정합니다. 큰 글자·야간·긴 장소명 등 실제 네이티브 표시10조건과 Debug86/Release84·빌드·Lint오류0, 같은 키 Release 설치를 확인했습니다. 진행 예약·설정39개·기존 DB행을 보존했습니다. [상세 변경·검증·APK](docs/NATIVE_UI_0.2.9.md)
+차량에서는 창문 상태와 좌석 점유 신호를 확인하고, 이용자가 남긴 짐 메모를 다시 보여줍니다. 휴대폰에서는 사진과 직접 확인 내역을 저장하고 점검 접수를 마칩니다.
 
-차량은 **0.2.9+13**, Flutter·서버는 **0.2.8**입니다. 이전 위치/내비 통합과 사진·음성 전체 근거를 이번 UI 표시 검토와 구분합니다. 기존 영상은0.2.6을 유지하고 새 영상은 최종 게시 요청 때 올립니다.
+## 이용 흐름
 
-처음 카셰어링을 이용하는 사람의 계정 연결·인수·이용·반납 점검을 돕습니다. 차량 신호를 좌석 위치 안내와 한국어 음성으로 연결하고 사진·직접 확인·접수 기록을 보관합니다.
+1. **차량 연결과 인수** — 예약에 사용한 이메일로 로그인합니다. 차량 QR을 확인하고 연결을 승인한 뒤 인수 상태를 저장합니다. 카메라가 없으면 QR의 전체 링크를 입력할 수 있습니다.
+2. **짐 메모** — P 상태에서 “트렁크에 캐리어를 뒀어”처럼 말합니다. 인식된 장소와 물건을 확인하거나 수정한 뒤 저장합니다. 직접 입력도 가능합니다.
+3. **반납 장소로 이동** — 예약에 등록된 장소를 확인하고 Pleos 내비로 길 안내를 받습니다. 차량 앱이 열린 동안 장소 근처에서 새 위치와 P 상태가 확인되면 반납 준비를 제안합니다.
+4. **차량에서 반납 점검** — 열린 창문을 먼저 확인하고, 저장한 짐 메모와 점유 좌석을 화면·음성으로 안내합니다. 이용자가 반납 점검을 저장하면 다음 단계로 넘어갑니다.
+5. **휴대폰에서 마무리** — 창문·소지품·외관 사진과 직접 확인 내역을 저장한 뒤 제출합니다. 차량과 휴대폰에서 같은 접수 번호를 확인할 수 있습니다.
 
-## 이전 0.2.8 · 반납 장소 안내
+좌석 신호는 사람과 짐을 구분하지 못합니다. 비점유 좌석과 메모하지 않은 공간도 직접 살펴봐야 합니다. 문 열림 관측, 직접 표시한 공간, 물건 메모는 서로 구분해 보관합니다.
 
-예약별 반납 장소, Pleos FusedLocation의 새 차량 위치 직선거리, P에서 확인하는 NaviHelper 길 안내를 추가했습니다. 실제 목적지·안내 상태를 확인하며 가까워져도 자동 반납하지 않습니다. 위치 권한 거부·오래된 값은 확인 불가로 표시하고 현재 차량 좌표는 서버에 보내지 않습니다. [구현·11조건 실제 SDK 시험·예약 발급·빌드](docs/RETURN_LOCATION_0.2.8.md)
+## APK와 시연 영상
 
-같은 제출 Release에 차량·휴대폰 0.2.8+12 APK와 소스 ZIP·지문을 추가합니다. Android Debug 86/Release 84·Lint 오류 0, 서버 42·Flutter 42(선택 2개 제외)·분석 문제 0 및 두 Release 설치/첫 실행을 확인했습니다. 시험은 분리 Debug AVD의 시험 장소·모의 GPS·테스트 VIN입니다. 사진·최종 접수·TTS 전체 근거와 보존 영상은 0.2.6/0.2.5입니다. 새 영상은 최종 게시 요청 때 갱신합니다.
+현재 차량 앱과 Flutter 앱은 **0.3.0+14**입니다. [제출 자료 Release](https://github.com/neolabs120-mobile/pleos-rental-check/releases/tag/v0.2.6-submission)에서 APK와 소스를 받을 수 있습니다.
 
-## 이전 Flutter 0.2.7 · 상단 연결 카드
+| 파일 | 용도 |
+|---|---|
+| [차량용 APK](https://github.com/neolabs120-mobile/pleos-rental-check/releases/download/v0.2.6-submission/rentcheck_vehicle_0.3.0_release.apk) | Kotlin·Compose 앱. Android 9 이상과 Pleos Connect 환경이 필요합니다. |
+| [휴대폰용 APK](https://github.com/neolabs120-mobile/pleos-rental-check/releases/download/v0.2.6-submission/rentcheck_mobile_0.3.0_release.apk) | Flutter 앱. Android 7 이상에서 사용하며, 설정에 실행할 HTTPS 서버 주소를 입력합니다. |
+| [소스 코드 ZIP](https://github.com/neolabs120-mobile/pleos-rental-check/releases/download/v0.2.6-submission/rentcheck_source_0.3.0.zip) | 0.3.0 소스입니다. 저장소의 main에서도 확인할 수 있습니다. |
+| [파일 지문](https://github.com/neolabs120-mobile/pleos-rental-check/releases/download/v0.2.6-submission/SHA256SUMS_0.3.0.txt) | 내려받은 APK·소스·안내문의 SHA-256을 확인할 때 사용합니다. |
 
-홈 상단에 차량 연결 카드를 배치해 QR 스캔과 ‘카메라가 없나요? 링크 입력’을 먼저 보여줍니다. 이용할 예약만 홈에 표시하고 완료된 이용은 기록 탭에 보관합니다. 링크 확인 뒤 예약 차량을 선택하고 명시적으로 연결을 승인하는 절차는 그대로입니다.
-
-[기존 제출 Release 페이지](https://github.com/neolabs120-mobile/pleos-rental-check/releases/tag/v0.2.6-submission)에 당시 Flutter 0.2.7 APK·소스를 추가했습니다. 기존 영상은 0.2.6입니다. [변경·검증·빌드 안내](docs/FLUTTER_HOME_0.2.7.md)
-
-## 구성
-
-- app: Kotlin/Compose 차량 앱 0.2.9. Vehicle 2.3.2, vehicle-aidl 1.1.1, TextToSpeech 3.3.1, FusedLocation 1.1.3, NaviHelper 3.0.5.
-- mobile: Flutter 이용자 앱과 웹 0.2.8. 계정, 예약, QR 승인, 사진, 직접 확인, 접수.
-- server: FastAPI 서버와 사진·계정 처리. requirements-lock.txt 포함.
-- scripts, app/src/test, app/src/androidTest, mobile/test, server/test_*.py: 단위·통합 검증.
-
-차량 SDK는 Kotlin 앱에서 호출합니다. Flutter가 차량 SDK를 직접 호출하지 않습니다. 좌석 원시값 1은 비점유, 2는 점유이며 알 수 없는 값은 확인 불가입니다. 사람과 짐은 구분하지 못합니다.
-
-## 시연 영상과 Release APK
+두 APK는 기존 배포 키로 서명했습니다. Release 태그는 제출한 링크를 유지하기 위해 `v0.2.6-submission`을 사용합니다. GitHub가 자동으로 제공하는 **Source code ZIP은 당시 0.2.6 소스**이므로, 최신 버전은 위 ZIP이나 main을 이용해 주세요. 이전 APK와 영상도 같은 Release에 남겨두었습니다.
 
 [![렌트체크 3분 시연](docs/demo-cover.png)](https://github.com/neolabs120-mobile/pleos-rental-check/releases/download/v0.2.6-submission/rentcheck_demo_0.2.6_3min.mp4)
 
-[0.2.6 제출 자료 릴리스](https://github.com/neolabs120-mobile/pleos-rental-check/releases/tag/v0.2.6-submission)에서 받습니다.
+영상은 **0.2.6 기준**입니다. 실제 Pleos 에뮬레이터의 창문·좌석·음성 안내와 Flutter 웹의 사진 등록·최종 접수 과정을 담았습니다. 음성 짐 메모와 도착 안내는 최신 APK에서 확인할 수 있습니다.
 
-- `rentcheck_vehicle_0.2.9_release.apk`: Kotlin/Compose 차량용, Android 9 이상, 실제 Pleos 환경과 정상 VIN 필요.
-- [`rentcheck_mobile_0.2.8_release.apk`](https://github.com/neolabs120-mobile/pleos-rental-check/releases/download/v0.2.6-submission/rentcheck_mobile_0.2.8_release.apk): 최신 Flutter 휴대폰용, Android 7 이상, 상단 연결 카드·링크 입력, 설정에서 HTTPS 서버 주소 입력.
-- `rentcheck_demo_0.2.6_3min.mp4`: 1920×1080·30fps·3분, 실제 AVD 화면·Flutter 웹 캡처와 당시 실제 Pleos 출력 음성.
-- `SHA256SUMS_0.2.9.txt`: 최신 차량 APK·소스 ZIP·안내문 지문. Flutter 0.2.8 지문은 `SHA256SUMS_0.2.8.txt`를 참고하세요. 이전 `APK_SHA256.txt`는 0.2.6 APK 두 개의 지문입니다. 새 APK도 같은 배포 키로 서명했고 debuggable=false입니다.
-- `rentcheck_source_0.2.9.zip`: 이번 소스 스냅샷입니다. 기존 0.2.6 태그의 자동 Source code ZIP은 이전 버전으로 유지됩니다.
+## Pleos 연동과 프로젝트 구성
 
-이전 차량 0.2.6·Flutter 0.2.6/0.2.7 APK와 영상·지문 파일도 그대로 보존했습니다. 새 시연 영상은 최종 개선 완료 후 별도 요청에 따라 게시합니다.
+차량 SDK는 Kotlin 앱에서 호출하고, Flutter 앱은 서버를 통해 예약과 점검 기록을 받습니다.
 
-시연 영상은 알려진 Pleos ARM64 AVD의 Debug에서 명시적으로 테스트 VIN을 켠 새 체험 예약으로 촬영했습니다. 실제 SDK 창문·좌석과 실제 TTS를 사용하며 생성 시험 사진·장면 편집을 표시했습니다. 로그인된 계정에서 시작하고, 웹 사진 선택·전송·직접 확인·최종 접수는 실제 브라우저로 진행했습니다. 차량 장면은 androidTest의 `SubmissionVideoFlowRunner`가 실제 MainActivity/ViewModel의 동일한 이벤트를 호출하며 예시 UI 상태를 주입하지 않습니다.
+| SDK | 사용하는 곳 |
+|---|---|
+| Vehicle 2.3.2 | VIN·기어·창문·문·좌석·배터리·주행거리 등 차량 상태 조회, 인수·반납 비교, 창문 조작 연습 |
+| SpeechToText 3.3.1 | 이용자가 시작한 한국어 음성 짐 메모 입력. `ON_DEVICE` 모드 사용 |
+| TextToSpeech 3.3.1 | 도착 후 반납 준비 제안, 짐 메모와 점유 좌석의 한국어 안내. `ON_DEVICE` 모드 사용 |
+| FusedLocation 1.1.3 | 차량의 새 위치와 반납 장소 사이 직선거리, 근처인지 확인하는 참고 정보 |
+| NaviHelper 3.0.5 | 사용자가 승인한 반납 목적지로 길 안내, 실제 내비 목적지·안내 상태 확인 |
 
-이전 [v0.2.6 Debug 체험 APK](https://github.com/neolabs120-mobile/pleos-rental-check/releases/tag/v0.2.6)는 보존했습니다. 에뮬레이터의 정상 SDK VIN 미수신 문제는 남아 있으며 Release에는 테스트 VIN 대체가 없습니다. 두 Release APK의 설치·첫 실행은 확인했지만 정상 VIN을 사용하는 Release 전체 대여 흐름과 실폰 촬영은 미검증입니다. 휴대폰 Release는 HTTP를 허용하지 않으며 공개 운영 서버는 제공하지 않습니다. 서버를 별도로 준비해야 합니다. 기존 Debug와 Release의 서명이 다르므로 기존 Debug 데이터를 지우며 교체하지 말고 별도 시험 환경에서 설치합니다.
+좌석 점유는 SDK 2.3.2의 Boolean 변환에서 정보가 사라지는 문제 때문에 같은 Vehicle Service의 `vehicle-aidl 1.1.1` 원시값을 함께 읽습니다. [API 활용 현황](docs/PLEOS_API_USAGE_2026-11-01.md)에 실제 수신 여부와 제한 사항을 정리했습니다.
 
-[구성·검증·서명 절차](docs/RELEASE_SUBMISSION_0.2.6.md)
+```text
+app/       Kotlin·Compose 차량 앱
+mobile/    Flutter 휴대폰 앱과 웹
+server/    FastAPI 서버: 계정, 예약, 사진, 점검 기록
+scripts/   에뮬레이터 통합 시험 도구
+docs/      기능별 구현·검증 기록
+```
 
-## 새 환경 실행
+## 직접 실행하기
 
-Android Studio, JDK 17 이상, Android SDK 35, Flutter 3.38 이상과 Python을 준비합니다. Gradle·Flutter·Python 의존성은 각 저장소에서 받습니다. 서명 키·SDK·캐시·실제 데이터는 배포하지 않습니다.
+Android Studio, JDK 17, Android SDK 35, Flutter 3.38 이상, Python 환경을 준비합니다. SDK·서명 키·실제 계정 데이터는 저장소에 포함하지 않습니다.
 
-차량 앱은 저장소 루트를 Android Studio로 열거나 ./gradlew assembleDebug로 빌드합니다. 기본 Debug 서명 키 또는 본인 키를 사용합니다. 동봉 APK의 기존 개인 서명 키는 포함하지 않았습니다. Android 단위/빌드 검사는 ./gradlew testDebugUnitTest testReleaseUnitTest assembleDebug assembleRelease lintDebug입니다.
+차량 앱은 저장소 루트를 Android Studio로 열거나 다음 명령으로 빌드합니다. 본인의 Debug 키를 사용하며, Release 서명 방법은 [배포 안내](docs/RELEASE_SUBMISSION_0.2.6.md)를 참고하세요.
 
-아래는 기존 서버와 분리한 로컬 시험 포트 8788 예시입니다. 저장소 루트에서 Python 가상환경을 만들고 server/requirements-lock.txt를 설치합니다.
+```sh
+./gradlew assembleDebug
+```
+
+아래는 **새 로컬 시험 환경**을 만드는 예시입니다. 저장소 루트에서 서버 환경과 시험용 키를 준비합니다.
 
 ```sh
 python3 -m venv .venv
@@ -66,34 +74,45 @@ export RENTAL_MAIL_MODE=file
 export PUBLIC_BASE_URL=http://127.0.0.1:8788
 ```
 
-mobile에서 flutter pub get 후 웹을 만듭니다.
+Flutter 웹은 `mobile/`에서 빌드합니다.
 
 ```sh
+cd mobile
+flutter pub get
 flutter build web --debug --no-web-resources-cdn --base-href /mobile/ --dart-define=RENTAL_SERVER_URL=http://127.0.0.1:8788
 ```
 
-서버는 저장소 루트에서 다음과 같이 실행합니다.
+저장소 루트로 돌아와 같은 셸에서 서버를 실행합니다.
 
 ```sh
+cd ..
 python server/main.py --port 8788 --data-dir server/data --allow-emulator-test-vin --flutter-web-dir mobile/build/web
 ```
 
-웹은 http://127.0.0.1:8788/mobile/입니다. Android adb reverse tcp:8788 tcp:8788에 해당 Pleos AVD 시리얼을 명시하고 차량 설정에도 같은 서버 주소와 새로 생성한 운영자 키를 입력합니다. 실제 운영자 키와 계정 비밀번호는 저장소에 넣지 않습니다.
+웹 주소는 `http://127.0.0.1:8788/mobile/`입니다. 사용할 에뮬레이터에만 포트 연결을 설정하고, 차량 앱에도 같은 서버 주소와 시험용 운영자 키를 입력합니다.
 
-파일 메일 모드는 로컬 시험용입니다. 가입 확인번호는 새 server/data/mail-outbox에 생성되며 외부로 메일을 보내지 않습니다. 계정을 만들고 이메일을 확인한 뒤 같은 셸의 운영자 키로 테스트 예약을 발급합니다.
+```sh
+adb -s <Pleos_AVD_시리얼> reverse tcp:8788 tcp:8788
+```
+
+파일 메일 모드에서는 확인번호가 `server/data/mail-outbox/`에 생성됩니다. 웹에서 가입·이메일 확인을 마친 뒤 같은 이메일로 예약을 발급합니다.
 
 ```sh
 python server/issue_booking.py --base-url http://127.0.0.1:8788 --email 본인_시험계정 --vin TEST0000000000001 --vehicle-name 체험차량 --demo
 ```
 
-로그인 → 자동 예약 표시 → 차량 QR 생성·휴대폰 명시 승인 → 인수 저장 → 이용 중 → 반납 시 창문/좌석 새 조회 → 소지품 화면·음성 안내 → 반납 저장 → 사진 3종·직접 확인·메모 → 최종 접수 순서입니다. 카메라가 없으면 차량 QR의 전체 링크를 웹에 입력합니다. 알려진 열린 창문은 직접 확인으로 넘길 수 없습니다. 좌석 안내는 확인 후 닫고 계속 진행할 수 있습니다.
+반납 장소를 포함한 예약 발급 방법은 [반납 장소 안내 문서](docs/RETURN_LOCATION_0.2.8.md#시험-예약-발급)에 있습니다. 현재 ARM64 에뮬레이터의 정상 VIN 미수신 문제로, SDK 연동 시험에서는 알려진 Pleos AVD의 Debug 빌드에서만 명시적으로 테스트 VIN을 켭니다. Release의 실제 VIN 검증은 유지합니다.
 
-## 검증
+휴대폰 Release에는 별도로 준비한 HTTPS 서버가 필요합니다. 기본값 `https://rental.invalid`는 예시 주소이며, 공개 운영 서버를 제공하지 않습니다. 기존 Debug 앱과 Release 앱은 서명이 다르므로 데이터가 있는 Debug 앱을 지우며 교체하지 말고 분리된 기기나 시험 환경을 사용해 주세요.
 
-최신 UI는 [차량0.2.9 검증](docs/NATIVE_UI_0.2.9.md), SDK 통합은 [반납 장소0.2.8](docs/RETURN_LOCATION_0.2.8.md)을 따릅니다. 아래는 이전 전체 반납·영상 근거입니다.
+## 검증 범위
 
-0.2.6 Android Debug 82/Release 80, 빌드와 Lint 오류 0. 밝은 화면·음성 팝업·연결·620dp/큰 글자·야간 5조건을 확인했습니다. 최신 실제 체험에서 정상 계정 연결·인수·반납 저장 후 Flutter 웹 사진 3장·직접 확인 3종·최종 접수와 차량/웹/서버 번호 일치를 확인했습니다. TTS 10조건은 선행 0.2.5 검증 근거이며 이번 영상에서도 실제 한국어 안내 완료와 출력 PCM을 다시 확인했습니다. 자세한 범위는 docs/VALIDATION.md를 따릅니다.
+0.3.0은 Android Debug **95개**, Release **93개**, 서버 **45개**, Flutter **43개** 테스트를 통과했습니다. Flutter의 선택 통합 시험 2개는 제외했으며 정적 분석 문제와 Android Lint 오류는 0개입니다. 기존 Lint 경고 24개는 남아 있습니다.
 
-Release APK 두 개의 설치·첫 실행은 확인했습니다. 실차·정상 VIN 전체 통합·실폰 QR/촬영·iOS는 추가 검증 대상입니다. 앱의 점검 접수는 실제 사업자의 반납·요금 정산과 별도입니다. 자동 손상·책임 판정과 원격 차량 제어는 제공하지 않습니다.
+실제 Pleos 에뮬레이터에서는 생성한 한국어 음원을 공식 음성 입력 API로 보내 최종 인식 결과를 확인했습니다. 검토 후 저장·복원·취소, 실제 위치와 기어에 따른 도착 제안, 음성 완료, 창문 우선 안내와 반납 저장·동기화까지 **13개 항목**을 확인했습니다. 호스트 마이크는 사용하지 않았습니다.
 
-자동 통합 스크립트는 경로 인자를 지정해 사용합니다. macOS 기본 adb 경로는 현재 사용자 홈을 기준으로 하고 Flutter는 PATH에서 찾습니다. 본체 소스는 그대로이며 호스트 시험 스크립트의 도구 기본 경로만 배포 환경에 맞췄습니다.
+이번 시험은 Debug 테스트 VIN·모의 GPS·시험 장소를 사용했습니다. 실차 마이크 인식률, 정상 VIN을 사용하는 Release 전체 이용 흐름, 실폰 QR·사진 촬영과 iOS는 추가 확인이 필요합니다. 사진 등록부터 최종 접수까지의 전체 브라우저 시험과 기존 영상은 0.2.6 검증 기록을 참고하세요.
+
+가까운 위치나 P 상태만으로 지정 주차구역과 반납 완료를 판단하지 않습니다. 음성 원본과 현재 차량 좌표는 서버에 보관하지 않으며, 이용자가 확인해 저장한 물건 메모만 반납 기록에 포함합니다. 앱의 점검 접수는 실제 사업자의 반납 처리·요금 정산과 별도입니다.
+
+[0.3.0 구현·시험 기록](docs/VOICE_ARRIVAL_0.3.0.md) · [전체 검증 이력](docs/VALIDATION.md) · [차량 UI 0.2.9](docs/NATIVE_UI_0.2.9.md) · [반납 장소 0.2.8](docs/RETURN_LOCATION_0.2.8.md)

@@ -10,6 +10,24 @@ import 'dart:convert';
 
 // Protect the distinction between observed places, explicit luggage marks and the real photo/check submission requirements.
 void main() {
+  testWidgets('reviewed item notes stay separate from sensor observations', (
+    tester,
+  ) async {
+    // Show the user's saved item/location without an empty-history all-clear, even when neither a door opening nor a manual mark exists.
+    final memory = UsageMemory.fromJson({
+      'luggageMemos': [
+        {'space': 'TRUNK', 'item': '캐리어'},
+        {'space': 'UNKNOWN', 'item': '가방'},
+      ],
+    });
+    expect(memory.luggageMemos, hasLength(1));
+    await tester.pumpWidget(
+      MaterialApp(home: Scaffold(body: UsageMemoryNotice(memory))),
+    );
+    expect(find.textContaining('내가 저장한 짐 메모: 트렁크 · 캐리어'), findsOneWidget);
+    expect(find.textContaining('기록된 장소가 없어요'), findsNothing);
+    expect(find.textContaining('물건 감지 결과가 아니에요'), findsOneWidget);
+  });
   test('old and unknown memory never imply belongings are clear', () {
     // Older records and unknown area names must retain incomplete coverage and no invented location.
     final old = UsageMemory.fromJson(null);

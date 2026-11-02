@@ -15,6 +15,17 @@ enum class InspectionStage(val title: String) {
 }
 
 sealed interface InspectionEvent {
+    data class OpenVoiceMemo(val memo: kr.taeuk.pleos.rentalcheck.model.LuggageMemo? = null) : InspectionEvent
+    data object StartVoiceRecognition : InspectionEvent
+    data object StopVoiceRecognition : InspectionEvent
+    data object CloseVoiceMemo : InspectionEvent
+    data class EditVoiceMemo(val space: kr.taeuk.pleos.rentalcheck.model.StorageSpace?, val item: String) : InspectionEvent
+    data object ConfirmVoiceMemo : InspectionEvent
+    data class ForgetLuggageMemo(val space: kr.taeuk.pleos.rentalcheck.model.StorageSpace) : InspectionEvent
+    data object DismissArrivalPrompt : InspectionEvent
+    data object BeginArrivalReturn : InspectionEvent
+    data object ReplayArrivalSpeech : InspectionEvent
+    data object StopArrivalSpeech : InspectionEvent
     data object RequestReturnLocationPermission : InspectionEvent
     data object RetryReturnLocation : InspectionEvent
     data class RequestReturnDirections(val destination: kr.taeuk.pleos.rentalcheck.navigation.ReturnLocation) : InspectionEvent

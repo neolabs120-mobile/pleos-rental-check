@@ -32,7 +32,14 @@ internal class EmulatorTestVehicleDataSource(private val real: VehicleDataSource
 
     override suspend fun readSnapshot(): VehicleSnapshot {
         // Replace only the opted-in emulator identity, retaining the original SDK VIN status and every other real SDK reading.
-        val snapshot = real.readSnapshot()
+        return withTestIdentity(real.readSnapshot())
+    }
+
+    // Preserve the exact same explicit Debug-only VIN policy for small stationary probes; gear always comes from the real SDK.
+    override suspend fun readStationarySnapshot(): VehicleSnapshot = withTestIdentity(real.readStationarySnapshot())
+
+    // Keep one identity substitution implementation so normal snapshots and stationary interactions cannot disagree about emulator eligibility.
+    private fun withTestIdentity(snapshot: VehicleSnapshot): VehicleSnapshot {
         if (!enabled()) return snapshot
         val sdkVin = snapshot.find("vehicle.vin")?.copy(key = "vehicle.sdkVin", label = "SDK 원본 VIN (테스트 대체 전)")
         val testVin = VehicleReading("vehicle.vin", "에뮬레이터 테스트 VIN", ReadStatus.AVAILABLE, EMULATOR_TEST_VIN,

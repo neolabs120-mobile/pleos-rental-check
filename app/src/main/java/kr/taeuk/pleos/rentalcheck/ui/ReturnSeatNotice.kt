@@ -17,15 +17,23 @@ import androidx.compose.ui.unit.dp
 import kr.taeuk.pleos.rentalcheck.InspectionEvent
 import kr.taeuk.pleos.rentalcheck.speech.SeatSpeechState
 import kr.taeuk.pleos.rentalcheck.speech.SeatSpeechStatus
+import kr.taeuk.pleos.rentalcheck.model.LuggageMemo
 
 @Composable
-internal fun ReturnSeatNotice(seats: List<String>, speech: SeatSpeechState, onEvent: (InspectionEvent) -> Unit) {
+internal fun ReturnSeatNotice(seats: List<String>, speech: SeatSpeechState, onEvent: (InspectionEvent) -> Unit,
+    memos: List<LuggageMemo> = emptyList()) {
     // Point to the occupied locations without claiming an object was detected or requiring a seated person to leave before continuing the return.
     AlertDialog(
         onDismissRequest = { onEvent(InspectionEvent.DismissReturnSeatNotice) },
         title = { Text("내리기 전, 소지품을 확인해 주세요") },
         text = { Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
-            StateBadge("점유 신호가 있는 좌석", attention = true)
+            if (memos.isNotEmpty()) {
+                StateBadge("내가 저장한 짐 메모")
+                Spacer(Modifier.height(12.dp))
+                Text(memos.joinToString("\n") { it.space.label + " · " + it.item }, style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(12.dp))
+            }
+            if (seats.isNotEmpty()) StateBadge("점유 신호가 있는 좌석", attention = true)
             Spacer(Modifier.height(12.dp))
             Text(seats.joinToString(), style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.height(12.dp))

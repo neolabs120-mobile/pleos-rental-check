@@ -12,8 +12,8 @@ android {
         applicationId = "kr.taeuk.pleos.rentalcheck"
         minSdk = 28
         targetSdk = 35
-        versionCode = 13
-        versionName = "0.2.9"
+        versionCode = 14
+        versionName = "0.3.0"
         // Select an explicit integration runner for test APKs without adding an automation entry point to the production app.
         testInstrumentationRunner = providers.gradleProperty("rentalInstrumentationRunner")
             .getOrElse("kr.taeuk.pleos.rentalcheck.TripAssistanceFlowRunner")
@@ -39,6 +39,7 @@ kotlin {
 dependencies {
     implementation("ai.pleos.playground:Vehicle:2.3.2")
     implementation("ai.pleos.playground:TextToSpeech:3.3.1")
+    implementation("ai.pleos.playground:SpeechToText:3.3.1")
     implementation("ai.pleos.playground:FusedLocation:1.1.3")
     implementation("ai.pleos.playground:NaviHelper:3.0.5")
     implementation("ai.pleos.playground:vehicle-aidl:1.1.1")

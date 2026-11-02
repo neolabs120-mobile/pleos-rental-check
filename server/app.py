@@ -70,16 +70,31 @@ class Snapshot(StrictModel):
         return value
 
 
+class LuggageMemo(StrictModel):
+    space: Literal["FRONT_LEFT", "FRONT_RIGHT", "REAR_LEFT", "REAR_RIGHT", "TRUNK"]
+    item: str = Field(min_length=1, max_length=40)
+
+    @model_validator(mode="after")
+    def reviewed_item(self):
+        # Accept only the bounded, reviewed item name; reject control characters and blank text rather than retaining raw speech.
+        if self.item != self.item.strip() or not self.item.strip() or any(ord(c) < 32 or 127 <= ord(c) <= 159 for c in self.item):
+            raise ValueError("물건 이름을 공백과 제어 문자 없이 확인해 주세요.")
+        return self
+
+
 class UsageMemory(StrictModel):
     openedSpaces: list[Literal["FRONT_LEFT", "FRONT_RIGHT", "REAR_LEFT", "REAR_RIGHT", "TRUNK"]] = Field(default_factory=list, max_length=5)
     markedSpaces: list[Literal["FRONT_LEFT", "FRONT_RIGHT", "REAR_LEFT", "REAR_RIGHT", "TRUNK"]] = Field(default_factory=list, max_length=5)
     monitoringGaps: bool = True
+    luggageMemos: list[LuggageMemo] = Field(default_factory=list, max_length=5)
 
     @model_validator(mode="after")
     def unique_spaces(self):
-        # Store a bounded location set, not arbitrary personal descriptions or duplicate events masquerading as additional evidence.
+        # Keep observations, manual marks and reviewed item notes distinct, with at most one item note per supported location.
         if len(self.openedSpaces) != len(set(self.openedSpaces)) or len(self.markedSpaces) != len(set(self.markedSpaces)):
             raise ValueError("사용 공간은 중복 없이 기록해야 합니다.")
+        if len(self.luggageMemos) != len({memo.space for memo in self.luggageMemos}):
+            raise ValueError("같은 장소의 물건 메모는 하나로 정리해 주세요.")
         return self
 
 
@@ -270,7 +285,7 @@ def create_app(data_dir: Path, device_token: str, public_base_url: str, clock=ti
         return {"id": rental_id, "revision": row["revision"], "vinSuffix": vin[-6:],
             "isDemo": payload["pickup"]["source"] in {"DEMO · 합성 차량 데이터", EMULATOR_TEST_SOURCE},
             "usesTestVin": payload["pickup"]["source"] == EMULATOR_TEST_SOURCE,
-            "usageMemory": payload.get("usageMemory", UsageMemory().model_dump()),
+            "usageMemory": UsageMemory.model_validate(payload.get("usageMemory", {})).model_dump(),
             "submittedAtMillis": row["submitted_at"], "receiptId": row["receipt_id"],
             "photos": [{"id": p["id"], "phase": p["phase"], "category": p["category"], "sha256": p["sha256"], "createdAtMillis": p["created_at"]} for p in photo_rows if phase is None or p["phase"] == phase],
             "checks": checks if phase is None else checks.get(phase, Checklist().model_dump())}
@@ -317,6 +332,8 @@ def create_app(data_dir: Path, device_token: str, public_base_url: str, clock=ti
                 previous = json.loads(old["payload"])
                 previous.setdefault("bookingId", old["booking_id"])
                 previous.setdefault("usageMemory", UsageMemory().model_dump())
+                # Normalize additive defaults for idempotent old-client retries without mutating the saved historical payload.
+                previous["usageMemory"] = UsageMemory.model_validate(previous["usageMemory"]).model_dump()
                 if canonical(payload) == canonical(previous):
                     return summary(connection, identifier)
                 if old["submitted_at"]:

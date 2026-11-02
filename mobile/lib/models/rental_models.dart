@@ -118,13 +118,23 @@ class EvidencePhoto {
   final EvidenceCategory category;
 }
 
+class LuggageMemo {
+  // Decode only a supported place and reviewed item text; raw audio/transcripts are not part of the shared record schema.
+  LuggageMemo.fromJson(Json j)
+    : space = j['space'] as String,
+      item = j['item'] as String;
+  final String space, item;
+}
+
 class UsageMemory {
   // Decode only the five supported locations; older server records remain an explicitly incomplete observation history.
   UsageMemory.fromJson(Json? j)
     : opened = _spaces(j?['openedSpaces']),
       marked = _spaces(j?['markedSpaces']),
-      monitoringGaps = j?['monitoringGaps'] != false;
+      monitoringGaps = j?['monitoringGaps'] != false,
+      luggageMemos = _memos(j?['luggageMemos']);
   final List<String> opened, marked;
+  final List<LuggageMemo> luggageMemos;
   final bool monitoringGaps;
   static const labels = <String, String>{
     'FRONT_LEFT': '운전석 주변',
@@ -137,6 +147,26 @@ class UsageMemory {
   static List<String> _spaces(dynamic value) => value is List
       ? value.whereType<String>().where(labels.containsKey).toSet().toList()
       : [];
+
+  // Older records have no notes; malformed/unknown items are omitted instead of being attributed to another compartment.
+  static List<LuggageMemo> _memos(dynamic value) {
+    final places = <String>{};
+    return value is List
+        ? value
+              .whereType<Json>()
+              .where(
+                (j) =>
+                    labels.containsKey(j['space']) &&
+                    j['item'] is String &&
+                    (j['item'] as String).trim().isNotEmpty &&
+                    (j['item'] as String).length <= 40 &&
+                    places.add(j['space'] as String),
+              )
+              .take(5)
+              .map(LuggageMemo.fromJson)
+              .toList()
+        : [];
+  }
 }
 
 class RentalRecord {

@@ -1,5 +1,7 @@
 package kr.taeuk.pleos.rentalcheck.speech
 
+import kr.taeuk.pleos.rentalcheck.model.LuggageMemo
+
 enum class SeatSpeechStatus { IDLE, PREPARING, SPEAKING, DONE, STOPPED, FAILED }
 enum class SpeechEventKind { READY, STARTED, RMS, DONE, STOPPED, FAILED }
 data class SpeechEvent(val kind: SpeechEventKind, val rms: Double = 0.0, val error: String? = null)
@@ -20,6 +22,7 @@ class ReturnSeatSpeech(private val engine: SeatSpeechEngine, private val onChang
         private set
     private var identity: String? = null
     private var seats = emptyList<String>()
+    private var memos = emptyList<LuggageMemo>()
     private var lastKey: String? = null
     private var allowed = false
     private var generation = 0
@@ -27,12 +30,13 @@ class ReturnSeatSpeech(private val engine: SeatSpeechEngine, private val onChang
     private var started = false
 
     // Announce a changed occupied-seat set only while its fresh, authorized return notice can be shown; refresh/save must not replay the same reminder.
-    fun update(rental: String?, occupied: List<String>, eligible: Boolean) {
+    fun update(rental: String?, occupied: List<String>, eligible: Boolean, notes: List<LuggageMemo> = emptyList()) {
         if (identity != rental) {
             stop(); identity = rental; lastKey = null; state = SeatSpeechState(); onChanged(state)
         }
         seats = occupied.distinct()
-        allowed = eligible && rental != null && seats.isNotEmpty()
+        memos = notes
+        allowed = eligible && rental != null && (seats.isNotEmpty() || memos.isNotEmpty())
         if (!allowed) { stop(); return }
         if (key() != lastKey) play()
     }
@@ -52,12 +56,16 @@ class ReturnSeatSpeech(private val engine: SeatSpeechEngine, private val onChang
     }
 
     // Normalize only the deduplication key so SDK ordering cannot cause repeated speech while the spoken labels keep their natural display order.
-    private fun key(): String = identity + "|" + seats.sorted().joinToString("|")
+    private fun key(): String = identity + "|" + seats.sorted().joinToString("|") + "|" + memos.sortedBy { it.space.ordinal }.joinToString { it.space.name + ":" + it.item }
 
     // Send only generic seat locations, never VIN/account data, and keep voice failure independent of return storage and photo requirements.
     private fun play() {
         stop(); val token = generation; active = true; started = false; lastKey = key()
-        val text = "내리기 전 ${seats.joinToString(", ")} 좌석과 발밑에 두고 내리는 소지품이 없는지 확인해 주세요. 다른 좌석과 트렁크도 직접 확인해 주세요."
+        val text = buildString {
+            if (memos.isNotEmpty()) append("저장한 짐 메모예요. " + memos.joinToString(". ") { it.space.label + "에 " + it.item + " 메모를 남기셨어요" } + ". 직접 확인해 주세요. ")
+            if (seats.isNotEmpty()) append("내리기 전 ${seats.joinToString(", ")} 좌석과 발밑에 두고 내리는 소지품이 없는지 확인해 주세요. ")
+            append("다른 좌석과 트렁크도 직접 확인해 주세요.")
+        }
         state = state.copy(status = SeatSpeechStatus.PREPARING, text = text, error = null,
             requests = state.requests + 1, peakRms = 0.0)
         onChanged(state)

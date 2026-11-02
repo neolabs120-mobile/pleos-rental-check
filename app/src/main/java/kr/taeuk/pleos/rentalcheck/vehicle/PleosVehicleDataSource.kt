@@ -84,6 +84,15 @@ class PleosVehicleDataSource(context: Context) : VehicleDataSource, InteractionO
     }
 
     @Suppress("DEPRECATION")
+    // Read only real identity and gear under the same snapshot lock used by inspections, so foreground assistance does not issue overlapping reads.
+    override suspend fun readStationarySnapshot(): VehicleSnapshot = snapshotMutex.withLock {
+        val started = System.currentTimeMillis()
+        check(initialized)
+        val readings = supervisorScope { listOf(async { readVin() }, async { readGear() }).awaitAll().flatten() }
+        VehicleSnapshot(started, System.currentTimeMillis(), readings)
+    }
+
+    @Suppress("DEPRECATION")
     private suspend fun readGear(): List<VehicleReading> = guarded("gear.selection", "현재 기어") {
         // SDK 2.3.2 exposes this public CAR_DRIVE getter; require a real P response before offering the stationary exercise.
         val gear = sdkAwait<ai.pleos.playground.vehicle.constant.control.VehicleGear?> { ok, fail ->

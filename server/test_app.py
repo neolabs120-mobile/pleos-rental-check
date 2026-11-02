@@ -123,7 +123,7 @@ class RentalApiTests(unittest.TestCase):
     def test_usage_memory_is_preserved_in_owner_and_photo_views(self):
         # Observed places and explicit marks must travel with the return without satisfying mandatory photos or checks.
         payload = copy.deepcopy(self.payload)
-        memory = {"openedSpaces": ["REAR_RIGHT", "TRUNK"], "markedSpaces": ["TRUNK"], "monitoringGaps": True}
+        memory = {"openedSpaces": ["REAR_RIGHT", "TRUNK"], "markedSpaces": ["TRUNK"], "monitoringGaps": True, "luggageMemos": []}
         payload["usageMemory"] = memory
         self.assertEqual(memory, self.save(payload)["usageMemory"])
         owner = self.client.get('/api/account/rentals/' + self.id, headers=self.account_auth)
@@ -141,6 +141,43 @@ class RentalApiTests(unittest.TestCase):
             payload = copy.deepcopy(self.payload)
             payload["usageMemory"] = {"openedSpaces": values}
             self.assertEqual(422, self.client.put('/api/rentals/' + self.id, json=payload, headers=self.auth).status_code)
+
+    def test_reviewed_luggage_memo_is_shared_but_never_replaces_checks(self):
+        # A reviewed item note survives all owner/photo views, while missing evidence still blocks submission and returned notes remain frozen.
+        payload = copy.deepcopy(self.payload)
+        payload["usageMemory"] = {"luggageMemos": [{"space": "TRUNK", "item": "캐리어"}]}
+        saved = self.save(payload)
+        self.assertEqual([{"space": "TRUNK", "item": "캐리어"}], saved["usageMemory"]["luggageMemos"])
+        auth = self.link()
+        self.assertEqual(saved["usageMemory"], self.client.get('/api/upload/session', headers=auth).json()["usageMemory"])
+        self.assertEqual(409, self.client.post('/api/upload/submit', json={"revision": 2}, headers=auth).status_code)
+        changed = copy.deepcopy(payload)
+        changed["revision"] = 3
+        changed["usageMemory"]["luggageMemos"][0]["item"] = "가방"
+        self.assertEqual(409, self.client.put('/api/rentals/' + self.id, json=changed, headers=self.auth).status_code)
+
+    def test_luggage_memo_rejects_unreviewable_or_ambiguous_data(self):
+        # Enforce bounded item text, known spaces and one note per space, rejecting raw-transcript/audio fields as unknown input.
+        invalid = [{"space": "UNKNOWN", "item": "가방"}, {"space": "TRUNK", "item": " "},
+                   {"space": "TRUNK", "item": "a" * 41}, {"space": "TRUNK", "item": "가방\n"},
+                   {"space": "TRUNK", "item": "가방", "transcript": "raw speech"}]
+        for note in invalid:
+            payload = copy.deepcopy(self.payload); payload["usageMemory"] = {"luggageMemos": [note]}
+            self.assertEqual(422, self.client.put('/api/rentals/' + self.id, json=payload, headers=self.auth).status_code)
+        payload = copy.deepcopy(self.payload)
+        payload["usageMemory"] = {"luggageMemos": [{"space": "TRUNK", "item": "가방"}] * 2}
+        self.assertEqual(422, self.client.put('/api/rentals/' + self.id, json=payload, headers=self.auth).status_code)
+
+    def test_pre_voice_memory_retry_remains_idempotent(self):
+        # Normalize the additive field for a historical record instead of requiring a new revision or rewriting its pickup/return snapshots.
+        self.save()
+        import sqlite3
+        import json
+        with sqlite3.connect(Path(self.directory.name) / 'rentals.sqlite3') as connection:
+            old = json.loads(connection.execute("SELECT payload FROM rentals WHERE id=?", (self.id,)).fetchone()[0])
+            old["usageMemory"].pop("luggageMemos", None)
+            connection.execute("UPDATE rentals SET payload=? WHERE id=?", (json.dumps(old), self.id))
+        self.assertEqual([], self.save()["usageMemory"]["luggageMemos"])
 
     def test_usage_memory_freezes_with_return_observation(self):
         # A later upload cannot rewrite the places recorded with an already-saved return, even if it has a newer revision.

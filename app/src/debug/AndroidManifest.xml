@@ -1,4 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
     <!-- Local development server only. Release remains HTTPS-only. -->
-    <application android:usesCleartextTraffic="true" tools:replace="android:usesCleartextTraffic" />
+    <application android:usesCleartextTraffic="true" tools:replace="android:usesCleartextTraffic">
+        <activity android:name=".DebugInspectionActivity" android:exported="false"
+            android:taskAffinity="kr.taeuk.pleos.rentalcheck.sdkreview" />
+    </application>
 </manifest>

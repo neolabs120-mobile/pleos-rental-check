@@ -69,6 +69,23 @@ class TripAssistanceController(context: Context, private val source: VehicleData
         state = state.copy(memory = state.memory.mark(space, marked)); persist(); publish()
     }
 
+    // Save only the reviewed item/location and roll back the visible change if durable storage fails; a returned record is immutable.
+    fun rememberItem(memo: LuggageMemo): Boolean {
+        if (bookingId == null || frozen || !foreground) return false
+        val previous = state.memory; state = state.copy(memory = previous.remember(memo), problem = null)
+        val saved = persist()
+        if (!saved) state = state.copy(memory = previous)
+        publish(); return saved
+    }
+
+    // Delete only the selected user note, preserving observed openings and marks; failed persistence keeps the previous memo available.
+    fun forgetItem(space: StorageSpace) {
+        if (bookingId == null || frozen || !foreground) return
+        val previous = state.memory; state = state.copy(memory = previous.forget(space), problem = null)
+        if (!persist()) state = state.copy(memory = previous)
+        publish()
+    }
+
     // Opening the optional guide does not auto-start an exercise, control a vehicle, or mark a manual checklist as complete.
     fun openPractice() { if (bookingId != null && !frozen) { state = state.copy(practiceOpen = true); publish() } }
 
@@ -160,13 +177,13 @@ class TripAssistanceController(context: Context, private val source: VehicleData
     }
 
     // Persist a bounded, account-scoped set of places; failures stay visible and never clear the inspection record.
-    private fun persist() {
-        val id = bookingId ?: return
-        runCatching {
+    private fun persist(): Boolean {
+        val id = bookingId ?: return false
+        return runCatching {
             val json = JSONObject().put("bookingId", id).put("vin", vin).put("memory", UsageMemoryCodec.encode(state.memory))
                 .put("practiceCompleted", state.practiceCompleted)
             check(preferences.edit().putString("session", json.toString()).commit())
-        }.onFailure { state = state.copy(problem = "메모를 기기에 저장하지 못했어요. 소지품을 직접 확인해 주세요.") }
+        }.onFailure { state = state.copy(problem = "메모를 기기에 저장하지 못했어요. 소지품을 직접 확인해 주세요.") }.isSuccess
     }
 
     // Invalidate callbacks before unregistering so a queued event cannot contaminate a later renter or a frozen return record.

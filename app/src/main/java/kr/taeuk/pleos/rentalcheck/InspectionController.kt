@@ -13,6 +13,7 @@ import kr.taeuk.pleos.rentalcheck.model.SeatOccupancy
 import kr.taeuk.pleos.rentalcheck.speech.PleosSpeechEngine
 import kr.taeuk.pleos.rentalcheck.speech.ReturnSeatSpeech
 import kr.taeuk.pleos.rentalcheck.speech.SeatSpeechState
+import kr.taeuk.pleos.rentalcheck.speech.*
 import kr.taeuk.pleos.rentalcheck.cloud.*
 import kr.taeuk.pleos.rentalcheck.navigation.*
 import kr.taeuk.pleos.rentalcheck.vehicle.createVehicleEnvironment
@@ -37,6 +38,10 @@ data class InspectionUiState(
     val returnWindowDialog: ReturnWindowCheck? = null,
     val returnOccupiedSeats: List<String> = emptyList(),
     val returnSeatSpeech: SeatSpeechState = SeatSpeechState(),
+    val returnMemoNotice: Boolean = false,
+    val voiceMemo: VoiceMemoState = VoiceMemoState(),
+    val arrivalPrompt: Boolean = false,
+    val arrivalSpeech: SeatSpeechState = SeatSpeechState(),
     val retryReturnSave: Boolean = false,
     val errorMessage: String? = null,
     val serverConfigured: Boolean = false,
@@ -58,7 +63,7 @@ data class InspectionUiState(
 )
 
 /** Retained across Activity recreation. In-flight bounded reads drain before release(). */
-class InspectionController(context: Context) {
+class InspectionController(context: Context, recognitionEngine: LuggageRecognitionEngine? = null) {
     private val environment = createVehicleEnvironment(context.applicationContext)
     private val source = environment.source
     private val store = InspectionStore(context.applicationContext)
@@ -73,9 +78,24 @@ class InspectionController(context: Context) {
     private var foreground = false
     private var disposing = false
     private var initialized = false
+    private var stationaryJob: Job? = null
+    private var stationaryReading = false
+    private var stationarySnapshot: VehicleSnapshot? = null
+    private var stationaryGeneration = 0
+    private val arrival = ReturnArrival()
     var onChanged: ((InspectionUiState) -> Unit)? = null
     var state = InspectionUiState()
         private set
+    private val voiceMemo = LuggageVoice(recognitionEngine ?: PleosLuggageRecognition(context.applicationContext, scope)) {
+        // Recognition modifies only the transient editor; the normal save event owns durable memo changes.
+        state = state.copy(voiceMemo = it)
+        if (foreground) onChanged?.invoke(state)
+    }
+    private val arrivalSpeech = ArrivalSpeech(PleosSpeechEngine(context.applicationContext, scope)) {
+        // Playback events cannot accept the arrival suggestion or advance the return stage.
+        state = state.copy(arrivalSpeech = it)
+        if (foreground) onChanged?.invoke(state)
+    }
     private val returnSpeech = ReturnSeatSpeech(PleosSpeechEngine(context.applicationContext, scope)) {
         // Speech events update presentation only; they must not recursively retrigger automatic playback or mutate inspection evidence.
         state = state.copy(returnSeatSpeech = it)
@@ -87,6 +107,7 @@ class InspectionController(context: Context) {
     private val returnGuide = ReturnGuideController(PleosReturnGuideEngine(context.applicationContext, scope), scope, {
         // Location/navigation callbacks update presentation without recursively restarting subscriptions or changing inspection records.
         state = state.copy(returnGuide = it)
+        updateArrival()
         if (foreground) onChanged?.invoke(state)
     })
 
@@ -120,22 +141,28 @@ class InspectionController(context: Context) {
                 delay(4_000)
             }
         }
+        monitorStationaryState()
     }
 
     fun stop() {
         foreground = false
+        stationaryGeneration++
+        voiceMemo.attach(null)
+        arrivalSpeech.stop()
+        stationarySnapshot = null
+        if (!stationaryReading) { stationaryJob?.cancel(); stationaryJob = null }
         returnGuide.stop()
         returnSpeech.stop()
         assistance.stop()
         pairingPoll?.cancel()
         onChanged = null
-        if (readJob?.isActive != true) release()
+        if (readJob?.isActive != true && !stationaryReading) release()
     }
 
     fun dispose() {
         disposing = true
         stop()
-        if (readJob?.isActive != true) scope.cancel()
+        if (readJob?.isActive != true && !stationaryReading) scope.cancel()
     }
 
     fun refresh() = collect(CaptureAction.REFRESH)
@@ -145,13 +172,36 @@ class InspectionController(context: Context) {
     fun dispatch(event: InspectionEvent) {
         // Keep navigation and storage behind the paired-account guards; only disconnected emulator setup may change test identity.
         val voiceControl = event in listOf(InspectionEvent.DismissReturnSeatNotice, InspectionEvent.StopReturnSeatSpeech,
-            InspectionEvent.ReplayReturnSeatSpeech)
+            InspectionEvent.ReplayReturnSeatSpeech, InspectionEvent.CloseVoiceMemo, InspectionEvent.StopVoiceRecognition,
+            InspectionEvent.DismissArrivalPrompt, InspectionEvent.StopArrivalSpeech)
         if ((!voiceControl && (state.busy || state.cloudBusy || state.accountBusy)) || disposing) return
         if (state.pairedBooking == null && event !in listOf(InspectionEvent.Refresh,
                 InspectionEvent.CreateAccountQr, InspectionEvent.CheckAccountConnection,
                 InspectionEvent.DisconnectAccount, InspectionEvent.StartNewPickup) && event !is InspectionEvent.ConfigureServer &&
                 event !is InspectionEvent.SetEmulatorTestMode) return
         when (event) {
+            is InspectionEvent.OpenVoiceMemo -> if (memoEditable()) { arrivalSpeech.stop(); voiceMemo.open(event.memo); publish() }
+            InspectionEvent.StartVoiceRecognition -> if (memoEditable() && state.voiceMemo.open) stationaryAction {
+                if (state.voiceMemo.open) { arrivalSpeech.stop(); returnSpeech.stop(); voiceMemo.start() }
+            }
+            InspectionEvent.StopVoiceRecognition -> voiceMemo.problem("음성 입력을 중지했어요. 내용을 확인하거나 직접 입력해 주세요.")
+            InspectionEvent.CloseVoiceMemo -> { voiceMemo.close(); publish() }
+            is InspectionEvent.EditVoiceMemo -> voiceMemo.edit(event.space, event.item)
+            InspectionEvent.ConfirmVoiceMemo -> if (memoEditable() && state.voiceMemo.open && !state.voiceMemo.capturing) {
+                val memo = state.voiceMemo.draft.confirmed()
+                if (memo == null) voiceMemo.problem("장소를 선택하고 물건 이름을 40자 이내로 적어 주세요.")
+                else stationaryAction { if (state.voiceMemo.open && assistance.rememberItem(memo)) voiceMemo.close() }
+            }
+            is InspectionEvent.ForgetLuggageMemo -> if (memoEditable()) stationaryAction { assistance.forgetItem(event.space) }
+            InspectionEvent.DismissArrivalPrompt -> { arrival.dismiss(); arrivalSpeech.stop(); state = state.copy(arrivalPrompt = false); publish() }
+            InspectionEvent.BeginArrivalReturn -> if (state.arrivalPrompt && state.stage == InspectionStage.ACTIVE) stationaryAction {
+                if (state.stage == InspectionStage.ACTIVE && state.returnGuide.distanceMeters?.let { it <= 150 } == true &&
+                    state.returnGuide.fix?.let { System.currentTimeMillis() - it.timestampMillis in -5_000..15_000 } == true) {
+                    arrival.dismiss(); arrivalSpeech.stop(); state = state.copy(arrivalPrompt = false); dispatch(InspectionEvent.BeginReturn)
+                } else state = state.copy(errorMessage = "현재 위치를 다시 확인해 주세요. 반납 점검은 직접 시작할 수 있어요.")
+            }
+            InspectionEvent.ReplayArrivalSpeech -> if (state.arrivalPrompt && stationaryFor(stationarySnapshot, state.pairedBooking?.vin, System.currentTimeMillis())) arrivalSpeech.play()
+            InspectionEvent.StopArrivalSpeech -> arrivalSpeech.stop()
             InspectionEvent.RequestReturnLocationPermission -> Unit // The Activity owns the driver's explicit Android permission prompt.
             InspectionEvent.RetryReturnLocation -> if (foreground && state.stage in listOf(InspectionStage.ACTIVE, InspectionStage.RETURN)) returnGuide.retry()
             is InspectionEvent.RequestReturnDirections -> requestReturnDirections(event.destination)
@@ -172,6 +222,7 @@ class InspectionController(context: Context) {
             InspectionEvent.CapturePickup -> if (state.stage == InspectionStage.PICKUP) capturePickup()
             InspectionEvent.CaptureReturn -> if (state.stage == InspectionStage.RETURN) captureReturn()
             InspectionEvent.BeginReturn -> if (state.record != null && state.record?.returned == null) {
+                voiceMemo.close(); arrival.dismiss(); arrivalSpeech.stop()
                 returnSpeech.newAttempt()
                 state = state.copy(stage = InspectionStage.RETURN, windowManuallyChecked = false, errorMessage = null)
                 refresh()
@@ -184,7 +235,7 @@ class InspectionController(context: Context) {
                 publish()
             }
             InspectionEvent.DismissReturnSeatNotice -> {
-                state = state.copy(returnOccupiedSeats = emptyList())
+                state = state.copy(returnOccupiedSeats = emptyList(), returnMemoNotice = false)
                 publish()
             }
             InspectionEvent.StopReturnSeatSpeech -> returnSpeech.stop()
@@ -215,7 +266,7 @@ class InspectionController(context: Context) {
             InspectionEvent.Back -> {
                 val record = state.record
                 state = state.copy(stage = record?.let(InspectionStage::afterSave) ?: InspectionStage.CONNECT, errorMessage = null,
-                    returnWindowDialog = null, returnOccupiedSeats = emptyList(),
+                    returnWindowDialog = null, returnOccupiedSeats = emptyList(), returnMemoNotice = false,
                     windowManuallyChecked = if (record?.returned != null) record.returnWindowManuallyChecked
                         else record?.pickupWindowManuallyChecked ?: false)
                 publish()
@@ -268,7 +319,8 @@ class InspectionController(context: Context) {
                     return@launch
                 }
                 if (state.stage == InspectionStage.RETURN && action != CaptureAction.PICKUP) {
-                    state = state.copy(returnOccupiedSeats = SeatOccupancy.occupiedLabels(snapshot))
+                    state = state.copy(returnOccupiedSeats = SeatOccupancy.occupiedLabels(snapshot),
+                        returnMemoNotice = assistance.state.memory.luggageMemos.isNotEmpty())
                     val windows = ReturnWindowCheck.from(snapshot)
                     if (!windows.canSave(manuallyChecked)) {
                         state = state.copy(returnWindowDialog = windows, retryReturnSave = action == CaptureAction.RETURN,
@@ -312,7 +364,7 @@ class InspectionController(context: Context) {
                 state = state.copy(busy = false)
                 if (!foreground || disposing) release()
                 publish()
-                if (disposing) scope.cancel()
+                if (disposing && !stationaryReading) scope.cancel()
                 else if (saved && state.serverConfigured) syncServer()
             }
         }
@@ -484,7 +536,7 @@ class InspectionController(context: Context) {
     private fun ensureSource() { if (!initialized) { source.initialize(); initialized = true } }
 
     private fun release() {
-        if (!initialized) return
+        if (!initialized || stationaryReading) return
         try {
             source.close()
         } catch (e: Exception) {
@@ -510,7 +562,7 @@ class InspectionController(context: Context) {
                 check(snapshot.find("gear.selection")?.let { it.available && it.value == "GEAR_PARK" } == true) { "길 안내 설정은 P 상태에서 진행해 주세요." }
                 state = state.copy(current = snapshot); returnGuide.navigate()
             } catch (error: Exception) { state = state.copy(errorMessage = error.message?.take(240) ?: "길 안내를 요청하지 못했어요.") }
-            finally { state = state.copy(busy = false); publish(); if (!foreground || disposing) release(); if (disposing) scope.cancel() }
+            finally { state = state.copy(busy = false); publish(); if (!foreground || disposing) release(); if (disposing && !stationaryReading) scope.cancel() }
         }
     }
 
@@ -518,17 +570,92 @@ class InspectionController(context: Context) {
     private fun canSpeakReturnNotice(): Boolean = foreground && !disposing && !state.busy && state.pairedBooking != null &&
         state.record?.bookingId == state.pairedBooking?.id && VehicleIdentity.vin(state.current) == state.pairedBooking?.vin &&
         state.stage in listOf(InspectionStage.RETURN, InspectionStage.EVIDENCE) && state.returnWindowDialog == null &&
-        state.returnOccupiedSeats.isNotEmpty() && ReturnWindowCheck.from(state.current).canSave(state.windowManuallyChecked)
+        (state.returnOccupiedSeats.isNotEmpty() || state.returnMemoNotice) && ReturnWindowCheck.from(state.current).canSave(state.windowManuallyChecked)
+
+    // Restrict notes to an authorized unreturned rental; a return form or saved return cannot edit the luggage history.
+    private fun memoEditable(): Boolean = foreground && !disposing && state.pairedBooking != null &&
+        state.stage in listOf(InspectionStage.CONNECT, InspectionStage.PICKUP, InspectionStage.ACTIVE) && state.record?.returned == null &&
+        VehicleIdentity.vin(state.current) == state.pairedBooking?.vin
+
+    // Recheck real P and VIN for each capture/save/arrival acceptance, including after slow reads or a background/account change.
+    private fun stationaryAction(action: () -> Unit) {
+        if (state.busy || state.cloudBusy || state.accountBusy || !foreground) return
+        val booking = state.pairedBooking ?: return
+        val generation = stationaryGeneration
+        state = state.copy(busy = true, errorMessage = null); publish()
+        readJob = scope.launch {
+            var confirmed = false
+            try {
+                ensureSource(); val snapshot = source.readStationarySnapshot()
+                check(foreground && !disposing && generation == stationaryGeneration && state.pairedBooking?.id == booking.id) { "현재 연결된 예약을 다시 확인해 주세요." }
+                check(stationaryFor(snapshot, booking.vin, System.currentTimeMillis())) { "차량 VIN과 P 상태를 확인하지 못했어요. 정차 후 다시 시도해 주세요." }
+                stationarySnapshot = snapshot
+                confirmed = true
+            } catch (error: Exception) {
+                if (state.voiceMemo.open) voiceMemo.problem(error.message ?: "정차 상태를 확인하지 못했어요.")
+                else state = state.copy(errorMessage = error.message ?: "정차 상태를 확인하지 못했어요.")
+            } finally {
+                state = state.copy(busy = false); publish()
+                if (!foreground || disposing) release()
+                if (disposing && !stationaryReading) scope.cancel()
+            }
+            // Invoke after the probe has fully cleared its busy flag; a new inspection job must retain ownership of its own busy state.
+            if (confirmed && foreground && !disposing) action()
+        }
+    }
+
+    // Poll only the small P/VIN probe while a note is open or a fresh nearby location makes an arrival suggestion relevant.
+    private fun monitorStationaryState() {
+        if (stationaryJob?.isActive == true) return
+        stationaryJob = scope.launch {
+            while (foreground && !disposing) {
+                if (state.pairedBooking != null && !state.busy && readJob?.isActive != true &&
+                    (state.voiceMemo.open || (state.stage == InspectionStage.ACTIVE && state.returnGuide.distanceMeters?.let { it <= 200 } == true))) {
+                    stationaryReading = true
+                    val generation = stationaryGeneration; val booking = state.pairedBooking?.id
+                    try {
+                        ensureSource(); val snapshot = source.readStationarySnapshot()
+                        stationarySnapshot = snapshot.takeIf { foreground && generation == stationaryGeneration && state.pairedBooking?.id == booking }
+                        if (state.voiceMemo.capturing && !stationaryFor(stationarySnapshot, state.pairedBooking?.vin, System.currentTimeMillis()))
+                            voiceMemo.problem("P 상태를 확인할 수 없어 음성 입력을 중지했어요. 정차 후 다시 시도해 주세요.")
+                    } catch (error: Exception) {
+                        stationarySnapshot = null
+                        if (state.voiceMemo.capturing) voiceMemo.problem("차량 상태를 읽지 못해 음성 입력을 중지했어요.")
+                    } finally { stationaryReading = false }
+                    updateArrival()
+                    if (foreground) onChanged?.invoke(state)
+                }
+                if (foreground && !disposing) delay(3_000)
+            }
+            if (readJob?.isActive != true) release()
+            if (disposing && readJob?.isActive != true) scope.cancel()
+        }
+    }
+
+    // A nearby/P prompt is optional and once per rental/destination; it never writes a return record or interprets GPS as the correct parking space.
+    private fun updateArrival() {
+        val booking = state.pairedBooking
+        val eligible = foreground && !disposing && !state.busy && !state.cloudBusy &&
+            state.stage == InspectionStage.ACTIVE && state.record?.returned == null && !state.voiceMemo.open && !state.assistance.practiceOpen
+        val announce = arrival.update(booking?.let { serverConfig.baseUrl + "|" + it.id },
+            state.returnGuide.copy(destination = booking?.returnLocation), stationarySnapshot, booking?.vin, System.currentTimeMillis(), eligible)
+        state = state.copy(arrivalPrompt = arrival.visible)
+        if (announce) arrivalSpeech.play()
+        else if (!arrival.visible) arrivalSpeech.stop()
+    }
 
     // Share one authoritative notice state with Compose and speech; cloud polling must not cause the same seat set to be announced repeatedly.
     private fun publish() {
+        voiceMemo.attach(if (memoEditable()) serverConfig.baseUrl + "|" + state.pairedBooking!!.id + "|" + state.pairedBooking!!.vin else null)
         val guideEnabled = foreground && !disposing && state.stage in listOf(InspectionStage.ACTIVE, InspectionStage.RETURN) &&
             state.record?.returned == null && state.record?.bookingId == state.pairedBooking?.id &&
             state.pairedBooking != null && VehicleIdentity.vin(state.current) == state.pairedBooking?.vin
         returnGuide.attach(if (guideEnabled) serverConfig.baseUrl + "|" + state.pairedBooking!!.id else null,
             if (guideEnabled) state.pairedBooking?.returnLocation else null)
         val identity = state.record?.let { serverConfig.baseUrl + "|" + it.bookingId + "|" + it.id }
-        returnSpeech.update(identity, state.returnOccupiedSeats, canSpeakReturnNotice())
+        updateArrival()
+        returnSpeech.update(identity, state.returnOccupiedSeats, canSpeakReturnNotice(),
+            if (state.returnMemoNotice) state.assistance.memory.luggageMemos else emptyList())
         if (foreground) onChanged?.invoke(state)
     }
     private enum class CaptureAction { REFRESH, PICKUP, RETURN }

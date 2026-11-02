@@ -71,7 +71,9 @@ fun RentalCheckScreen(state: InspectionUiState, onEvent: (InspectionEvent) -> Un
                 val editable = state.record?.returned == null && state.stage in listOf(InspectionStage.CONNECT, InspectionStage.PICKUP, InspectionStage.ACTIVE)
                 UsageMemoryCard(state.record?.takeIf { it.returned != null }?.usageMemory ?: state.assistance.memory,
                     onMark = if (editable) ({ space, marked -> onEvent(InspectionEvent.MarkStorageSpace(space, marked)) }) else null,
-                    problem = state.assistance.problem)
+                    problem = state.assistance.problem,
+                    onOpenMemo = if (editable) ({ onEvent(InspectionEvent.OpenVoiceMemo(it)) }) else null,
+                    onForgetMemo = if (editable) ({ onEvent(InspectionEvent.ForgetLuggageMemo(it)) }) else null)
             }
             LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(if (wide) 20.dp else 16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -150,6 +152,8 @@ fun RentalCheckScreen(state: InspectionUiState, onEvent: (InspectionEvent) -> Un
         }
     }
     if (state.assistance.practiceOpen) FamiliarizationDialog(state, onEvent)
+    if (state.voiceMemo.open) LuggageVoiceDialog(state, onEvent)
+    if (state.arrivalPrompt && !state.voiceMemo.open && !state.busy) ReturnArrivalDialog(state, onEvent)
     if (showSettings) ServerSettingsDialog(state.serverUrl,
         onDismiss = { showSettings = false }, onSave = { url, token ->
             showSettings = false; onEvent(InspectionEvent.ConfigureServer(url, token))
@@ -158,8 +162,9 @@ fun RentalCheckScreen(state: InspectionUiState, onEvent: (InspectionEvent) -> Un
         state.returnWindowDialog?.let { ReturnWindowDialog(it, onEvent) }
     }
     if (state.stage in listOf(InspectionStage.RETURN, InspectionStage.EVIDENCE) && !state.busy &&
-        state.returnWindowDialog == null && state.returnOccupiedSeats.isNotEmpty()) {
-        ReturnSeatNotice(state.returnOccupiedSeats, state.returnSeatSpeech, onEvent)
+        state.returnWindowDialog == null && (state.returnOccupiedSeats.isNotEmpty() || state.returnMemoNotice)) {
+        ReturnSeatNotice(state.returnOccupiedSeats, state.returnSeatSpeech, onEvent,
+            if (state.returnMemoNotice) state.assistance.memory.luggageMemos else emptyList())
     }
     selectedDetail?.let { name ->
         ModalBottomSheet(onDismissRequest = { selectedDetail = null }) {

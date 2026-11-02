@@ -46,7 +46,8 @@ internal fun FamiliarizationCard(state: InspectionUiState, onEvent: (InspectionE
 // Show observed openings and explicit luggage marks separately; neither is a declaration that an object exists or that belongings are all cleared.
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-internal fun UsageMemoryCard(memory: UsageMemory, onMark: ((StorageSpace, Boolean) -> Unit)? = null, problem: String? = null) {
+internal fun UsageMemoryCard(memory: UsageMemory, onMark: ((StorageSpace, Boolean) -> Unit)? = null, problem: String? = null,
+    onOpenMemo: ((LuggageMemo?) -> Unit)? = null, onForgetMemo: ((StorageSpace) -> Unit)? = null) {
     Panel {
         PanelTitle(if (onMark == null) "사용한 공간 다시 확인" else "짐을 둔 곳", if (onMark != null) "직접 표시" else "저장된 메모")
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -59,6 +60,16 @@ internal fun UsageMemoryCard(memory: UsageMemory, onMark: ((StorageSpace, Boolea
                 }
             } else Text(if (memory.markedSpaces.isEmpty()) "직접 표시한 짐 메모가 없어요. 사용한 공간을 직접 확인하세요."
                 else "직접 표시 · " + memory.markedSpaces.joinToString { storageLabel(it) }, style = MaterialTheme.typography.bodyMedium)
+            memory.luggageMemos.forEach { memo ->
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("${storageLabel(memo.space)} · ${memo.item}", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                    if (onOpenMemo != null) TextButton(onClick = { onOpenMemo(memo) }) { Text("수정") }
+                    if (onForgetMemo != null) TextButton(onClick = { onForgetMemo(memo.space) }) { Text("지우기") }
+                }
+            }
+            if (onOpenMemo != null) FilledTonalButton(onClick = { onOpenMemo(null) }, modifier = Modifier.heightIn(min = 52.dp)) {
+                Text("말로 짐 메모 · 직접 입력")
+            }
             Muted(if (memory.openedSpaces.isEmpty()) "열림 관측 기록이 없어요. 사용하지 않았다는 뜻은 아니에요."
                 else "문·트렁크 열림 관측 · " + memory.openedSpaces.joinToString { storageLabel(it) })
             Muted("물건의 유무는 판단하지 않아요. 화면이 꺼진 동안의 동작은 놓칠 수 있어요.")

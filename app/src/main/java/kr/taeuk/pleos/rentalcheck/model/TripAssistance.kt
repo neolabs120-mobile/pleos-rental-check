@@ -13,8 +13,15 @@ data class UsageMemory(
     val openedSpaces: Set<StorageSpace> = emptySet(),
     val markedSpaces: Set<StorageSpace> = emptySet(),
     val monitoringGaps: Boolean = true,
+    val luggageMemos: List<LuggageMemo> = emptyList(),
 ) {
-    val suggestedSpaces: Set<StorageSpace> get() = openedSpaces + markedSpaces
+    val suggestedSpaces: Set<StorageSpace> get() = openedSpaces + markedSpaces + luggageMemos.map { it.space }
+
+    // Keep one reviewed item description per compartment; editing a memo never rewrites observed door openings or manual location marks.
+    fun remember(memo: LuggageMemo): UsageMemory = copy(luggageMemos = (luggageMemos.filterNot { it.space == memo.space } + memo).sortedBy { it.space.ordinal })
+
+    // Removing the user's note does not claim that the compartment is empty and leaves every independent observation intact.
+    fun forget(space: StorageSpace): UsageMemory = copy(luggageMemos = luggageMemos.filterNot { it.space == space })
 
     // Only an available, in-range positive value with a known zero-closed range is evidence of an observed opening.
     fun observe(key: String, value: Int?, minimum: Int, maximum: Int, available: Boolean): UsageMemory {

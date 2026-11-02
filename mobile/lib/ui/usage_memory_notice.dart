@@ -23,11 +23,20 @@ class UsageMemoryNotice extends StatelessWidget {
           Text(
             '내가 짐을 뒀다고 표시한 곳: ${memory.marked.map((s) => UsageMemory.labels[s]!).join(', ')}',
           ),
-        if (memory.opened.isEmpty && memory.marked.isEmpty)
+        for (final memo in memory.luggageMemos)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              '내가 저장한 짐 메모: ${UsageMemory.labels[memo.space]} · ${memo.item}',
+            ),
+          ),
+        if (memory.opened.isEmpty &&
+            memory.marked.isEmpty &&
+            memory.luggageMemos.isEmpty)
           const Text('기록된 장소가 없어요. 사용한 공간과 소지품을 직접 확인해 주세요.'),
         const SizedBox(height: 10),
         const Text(
-          '문 열림은 소지품이 남았다는 뜻이 아니에요. 표시된 곳 외에도 직접 확인하고 소지품 사진·확인을 저장해 주세요.',
+          '문 열림과 짐 메모는 물건 감지 결과가 아니에요. 표시된 곳 외에도 직접 확인하고 소지품 사진·확인을 저장해 주세요.',
         ),
         if (memory.monitoringGaps)
           const Text('앱 화면이 꺼진 동안 등 관측하지 못한 동작이 있을 수 있어요.'),
