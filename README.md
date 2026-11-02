@@ -25,11 +25,15 @@
 | [소스 코드 ZIP](https://github.com/neolabs120-mobile/pleos-rental-check/releases/download/v0.2.6-submission/rentcheck_source_0.4.3.zip) | 0.4.3 소스입니다. 저장소의 main에서도 확인할 수 있습니다. |
 | [파일 지문](https://github.com/neolabs120-mobile/pleos-rental-check/releases/download/v0.2.6-submission/SHA256SUMS_0.4.3.txt) | 내려받은 APK·소스·안내문의 SHA-256을 확인할 때 사용합니다. |
 
-두 APK는 기존 배포 키로 서명했습니다. Release 태그는 제출한 링크를 유지하기 위해 `v0.2.6-submission`을 사용합니다. GitHub가 자동으로 제공하는 **Source code ZIP은 당시 0.2.6 소스**이므로, 최신 버전은 위 ZIP이나 main을 이용해 주세요. 이전 APK와 영상도 같은 Release에 남겨두었습니다.
+두 APK는 기존 배포 키로 서명했습니다. Release 태그는 제출한 링크를 유지하기 위해 `v0.2.6-submission`을 사용합니다. GitHub가 자동으로 제공하는 **Source code ZIP은 당시 0.2.6 소스**이므로, 최신 버전은 위 ZIP이나 main을 이용해 주세요. 이전 APK와 0.2.6 영상도 같은 Release에 남겨두었습니다.
 
-[![렌트체크 3분 시연](docs/demo-cover.png)](https://github.com/neolabs120-mobile/pleos-rental-check/releases/download/v0.2.6-submission/rentcheck_demo_0.2.6_3min.mp4)
+[![렌트체크 대여·반납 시나리오 영상](docs/demo-cover-0.4.3.jpg)](https://github.com/neolabs120-mobile/pleos-rental-check/releases/download/v0.2.6-submission/rentcheck_scenario_demo_0.4.3.mp4)
 
-영상은 **0.2.6 기준**입니다. 실제 Pleos 에뮬레이터의 창문·좌석·음성 안내와 Flutter 웹의 사진 등록·최종 접수 과정을 담았습니다. 이후 추가한 기능은 최신 APK와 구현 문서에서 확인할 수 있습니다. 새 영상은 최종 게시 요청 때 갱신합니다.
+**[대여·반납 시나리오 영상 보기 (0.4.3 · 2분 8초)](https://github.com/neolabs120-mobile/pleos-rental-check/releases/download/v0.2.6-submission/rentcheck_scenario_demo_0.4.3.mp4)** — 카셰어링을 처음 이용하는 가상 인물 “지수 씨”가 가입·예약 확인, 차량 연결, 인수, 반납 점검(끄고 내리기·소지품 안내), 사진·직접 확인, 최종 접수까지 진행하는 과정을 13장면으로 담았습니다.
+
+영상은 실제 렌트체크 앱 화면 캡처에 한국어 자막과 컴퓨터 합성 음성 내레이션을 더해 만들었습니다. 차량 쪽 기록은 시연용 합성 데이터이고 차량 화면은 에뮬레이터의 표시 검증 화면이며, 실차 검증 결과가 아닙니다. 휴대폰 화면은 [대여·반납 시나리오 시험](docs/FLUTTER_SCENARIO_0.4.3.md)에서 캡처했습니다.
+
+이전 영상: [3분 시연 (0.2.6)](https://github.com/neolabs120-mobile/pleos-rental-check/releases/download/v0.2.6-submission/rentcheck_demo_0.2.6_3min.mp4) — 실제 Pleos 에뮬레이터의 창문·좌석·음성 안내와 Flutter 웹의 사진 등록·최종 접수 과정을 녹화했습니다.
 
 ## Pleos 연동과 프로젝트 구성
 
