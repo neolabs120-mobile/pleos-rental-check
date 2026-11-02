@@ -54,8 +54,9 @@ class _LoginScreenState extends State<LoginScreen> with ActionState {
         },
       ),
       TextButton(
-        onPressed:
-            busy ? null : () => openPage(context, const ResetPasswordScreen()),
+        onPressed: busy
+            ? null
+            : () => openPage(context, const ResetPasswordScreen()),
         child: const Text('비밀번호를 잊으셨나요?'),
       ),
     ],

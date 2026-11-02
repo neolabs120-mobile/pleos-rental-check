@@ -63,7 +63,7 @@ data class InspectionUiState(
 )
 
 /** Retained across Activity recreation. In-flight bounded reads drain before release(). */
-class InspectionController(context: Context, recognitionEngine: LuggageRecognitionEngine? = null) {
+class InspectionController(context: Context, recognitionEngine: LuggageRecognitionEngine? = null, navigationEngine: ReturnGuideEngine? = null) {
     private val environment = createVehicleEnvironment(context.applicationContext)
     private val source = environment.source
     private val store = InspectionStore(context.applicationContext)
@@ -104,7 +104,7 @@ class InspectionController(context: Context, recognitionEngine: LuggageRecogniti
     private val assistance = TripAssistanceController(context.applicationContext, source, scope, ::ensureSource) {
         state = state.copy(assistance = it); publish()
     }
-    private val returnGuide = ReturnGuideController(PleosReturnGuideEngine(context.applicationContext, scope), scope, {
+    private val returnGuide = ReturnGuideController(navigationEngine ?: PleosReturnGuideEngine(context.applicationContext, scope), scope, {
         // Location/navigation callbacks update presentation without recursively restarting subscriptions or changing inspection records.
         state = state.copy(returnGuide = it)
         updateArrival()
@@ -193,6 +193,9 @@ class InspectionController(context: Context, recognitionEngine: LuggageRecogniti
                 else stationaryAction { if (state.voiceMemo.open && assistance.rememberItem(memo)) voiceMemo.close() }
             }
             is InspectionEvent.ForgetLuggageMemo -> if (memoEditable()) stationaryAction { assistance.forgetItem(event.space) }
+            is InspectionEvent.RequestChargeDirections -> state.pairedBooking?.returnLocation?.let { requestReturnDirections(it, event.stop) }
+            is InspectionEvent.CollectLuggage -> if (foreground && state.stage == InspectionStage.RETURN && state.record?.returned == null)
+                stationaryAction { assistance.collectItem(event.space, event.checked) }
             InspectionEvent.DismissArrivalPrompt -> { arrival.dismiss(); arrivalSpeech.stop(); state = state.copy(arrivalPrompt = false); publish() }
             InspectionEvent.BeginArrivalReturn -> if (state.arrivalPrompt && state.stage == InspectionStage.ACTIVE) stationaryAction {
                 if (state.stage == InspectionStage.ACTIVE && state.returnGuide.distanceMeters?.let { it <= 150 } == true &&
@@ -547,7 +550,7 @@ class InspectionController(context: Context, recognitionEngine: LuggageRecogniti
     }
 
     // Re-read actual gear and VIN after confirmation so a delayed tap cannot change Navigation while driving or for a different rental.
-    private fun requestReturnDirections(destination: ReturnLocation) {
+    private fun requestReturnDirections(destination: ReturnLocation, chargingStop: ChargingStop? = null) {
         if (!foreground || state.stage !in listOf(InspectionStage.ACTIVE, InspectionStage.RETURN) ||
             state.record?.returned != null || state.returnGuide.destination != destination || !state.returnGuide.navigation.connected ||
             state.returnGuide.navigation.busy || readJob?.isActive == true) return
@@ -560,7 +563,13 @@ class InspectionController(context: Context, recognitionEngine: LuggageRecogniti
                 check(state.returnGuide.destination == destination) { "반납 장소가 변경됐어요. 다시 확인해 주세요." }
                 check(VehicleIdentity.vin(snapshot) == booking.vin) { "연결한 차량 VIN을 확인하지 못했어요." }
                 check(snapshot.find("gear.selection")?.let { it.available && it.value == "GEAR_PARK" } == true) { "길 안내 설정은 P 상태에서 진행해 주세요." }
-                state = state.copy(current = snapshot); returnGuide.navigate()
+                if (chargingStop != null) {
+                    check(chargingStop in destination.chargingStops) { "예약에 등록된 충전소를 다시 선택해 주세요." }
+                    check(kr.taeuk.pleos.rentalcheck.model.BatteryReturn.from(state.record?.pickup, snapshot).shortfall?.let { it > 0 } == true) {
+                        "새 배터리 잔량에서 인수 기준의 부족분을 확인하지 못했어요. 차량 상태를 확인해 주세요."
+                    }
+                }
+                state = state.copy(current = snapshot); returnGuide.navigate(chargingStop)
             } catch (error: Exception) { state = state.copy(errorMessage = error.message?.take(240) ?: "길 안내를 요청하지 못했어요.") }
             finally { state = state.copy(busy = false); publish(); if (!foreground || disposing) release(); if (disposing && !stationaryReading) scope.cancel() }
         }

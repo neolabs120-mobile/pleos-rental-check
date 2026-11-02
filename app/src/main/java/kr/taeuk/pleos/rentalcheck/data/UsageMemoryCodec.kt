@@ -12,11 +12,18 @@ object UsageMemoryCodec {
         .put("openedSpaces", JSONArray(memory.openedSpaces.map { it.name }.sorted()))
         .put("markedSpaces", JSONArray(memory.markedSpaces.map { it.name }.sorted()))
         .put("monitoringGaps", memory.monitoringGaps)
+        .put("collectedSpaces", JSONArray(memory.collectedSpaces.map { it.name }.sorted()))
+        .put("luggageReviewRequired", memory.luggageReviewRequired)
         .put("luggageMemos", JSONArray(memory.luggageMemos.map { JSONObject().put("space", it.space.name).put("item", it.item) }))
 
     // Older records have no memory; unknown location names are discarded rather than attributed to a different compartment.
-    fun decode(json: JSONObject?): UsageMemory = UsageMemory(spaces(json?.optJSONArray("openedSpaces")),
-        spaces(json?.optJSONArray("markedSpaces")), json?.optBoolean("monitoringGaps", true) ?: true, memos(json?.optJSONArray("luggageMemos")))
+    fun decode(json: JSONObject?): UsageMemory {
+        val notes = memos(json?.optJSONArray("luggageMemos"))
+        return UsageMemory(spaces(json?.optJSONArray("openedSpaces")), spaces(json?.optJSONArray("markedSpaces")),
+            json?.optBoolean("monitoringGaps", true) ?: true, notes,
+            spaces(json?.optJSONArray("collectedSpaces")).intersect(notes.map { it.space }.toSet()),
+            json?.optBoolean("luggageReviewRequired", false) ?: false)
+    }
 
     // Discard malformed or duplicate historical notes without assigning them to another place or breaking older records.
     private fun memos(array: JSONArray?): List<LuggageMemo> = (0 until minOf(array?.length() ?: 0, 5)).mapNotNull { index ->

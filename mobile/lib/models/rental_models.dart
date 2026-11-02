@@ -33,6 +33,17 @@ class Booking {
   final DateTime? submittedAt;
   final ReturnLocation? returnLocation;
   bool get isSubmitted => submittedAt != null;
+  // Cache only server-issued booking metadata for the same account; an offline copy never authorizes a new vehicle connection.
+  Json toJson() => {
+    'id': id,
+    'bookingNumber': number,
+    'vehicleName': vehicleName,
+    'vinSuffix': vinSuffix,
+    'isDemo': isDemo,
+    'rentalId': rentalId,
+    'submittedAtMillis': submittedAt?.millisecondsSinceEpoch,
+    'returnLocation': returnLocation?.toJson(),
+  };
 }
 
 class ReturnLocation {
@@ -43,7 +54,13 @@ class ReturnLocation {
       latitude = (j['latitude'] as num).toDouble(),
       longitude = (j['longitude'] as num).toDouble(),
       instructions = j['instructions'] as String? ?? '',
-      isTest = j['isTest'] == true {
+      isTest = j['isTest'] == true,
+      parkingSteps = (j['parkingSteps'] as List? ?? [])
+          .map((v) => v as Json)
+          .toList(),
+      chargingStops = (j['chargingStops'] as List? ?? [])
+          .map((v) => v as Json)
+          .toList() {
     if (name.trim().isEmpty ||
         address.trim().isEmpty ||
         !latitude.isFinite ||
@@ -58,6 +75,18 @@ class ReturnLocation {
   final String name, address, instructions;
   final double latitude, longitude;
   final bool isTest;
+  final List<Json> parkingSteps, chargingStops;
+  // Preserve bounded operator instructions in the encrypted offline booking cache without collecting the phone's location.
+  Json toJson() => {
+    'name': name,
+    'address': address,
+    'latitude': latitude,
+    'longitude': longitude,
+    'instructions': instructions,
+    'isTest': isTest,
+    'parkingSteps': parkingSteps,
+    'chargingStops': chargingStops,
+  };
 }
 
 class EmailChallenge {
@@ -86,15 +115,18 @@ class ManualChecks {
     this.belongings = false,
     this.exterior = false,
     this.note = '',
+    this.collectedSpaces = const [],
   });
   factory ManualChecks.fromJson(Json j) => ManualChecks(
     windows: j['windows'] == true,
     belongings: j['belongings'] == true,
     exterior: j['exterior'] == true,
     note: j['note'] as String? ?? '',
+    collectedSpaces: UsageMemory._spaces(j['collectedSpaces']),
   );
   final bool windows, belongings, exterior;
   final String note;
+  final List<String> collectedSpaces;
   bool get complete => windows && belongings && exterior;
   bool checked(EvidenceCategory c) => switch (c) {
     EvidenceCategory.windows => windows,
@@ -106,6 +138,7 @@ class ManualChecks {
     'belongings': belongings,
     'exterior': exterior,
     'note': note,
+    'collectedSpaces': collectedSpaces,
   };
 }
 
@@ -132,8 +165,11 @@ class UsageMemory {
     : opened = _spaces(j?['openedSpaces']),
       marked = _spaces(j?['markedSpaces']),
       monitoringGaps = j?['monitoringGaps'] != false,
-      luggageMemos = _memos(j?['luggageMemos']);
-  final List<String> opened, marked;
+      luggageMemos = _memos(j?['luggageMemos']),
+      collectedSpaces = _spaces(j?['collectedSpaces']),
+      reviewRequired = j?['luggageReviewRequired'] == true;
+  final List<String> opened, marked, collectedSpaces;
+  final bool reviewRequired;
   final List<LuggageMemo> luggageMemos;
   final bool monitoringGaps;
   static const labels = <String, String>{
@@ -178,6 +214,7 @@ class RentalRecord {
       isDemo = j['isDemo'] == true,
       usesTestVin = j['usesTestVin'] == true,
       usageMemory = UsageMemory.fromJson(j['usageMemory'] as Json?),
+      batteryReturn = j['batteryReturn'] as Json? ?? const {},
       receiptId = j['receiptId'] as String?,
       submittedAt = millis(j['submittedAtMillis']),
       pickupAt = millis(j['pickupAtMillis']),
@@ -197,7 +234,7 @@ class RentalRecord {
   final DateTime? submittedAt, pickupAt, returnAt;
   final double? distanceKm, pickupFuel, returnFuel;
   final List<EvidencePhoto> photos;
-  final Json checks;
+  final Json checks, batteryReturn;
   bool get isSubmitted => submittedAt != null && receiptId != null;
   // Distinguish the substituted emulator identity from a fully synthetic demo so real SDK readings remain clearly described.
   String get demoNotice => usesTestVin
@@ -212,17 +249,25 @@ class UploadSession {
     : record = RentalRecord.fromJson(j),
       phase = j['phase'] as String,
       expiresAt = millis(j['expiresAtMillis'])!,
-      checks = ManualChecks.fromJson(j['checks'] as Json);
+      checks = ManualChecks.fromJson(j['checks'] as Json),
+      pickupPhotos = (j['pickupPhotos'] as List? ?? [])
+          .map((v) => EvidencePhoto.fromJson(v as Json))
+          .toList();
   final RentalRecord record;
   final String phase;
   final DateTime expiresAt;
   final ManualChecks checks;
+  final List<EvidencePhoto> pickupPhotos;
   bool get isReturn => phase == 'return';
   bool get expired => !DateTime.now().isBefore(expiresAt);
   bool get ready =>
       isReturn &&
       !expired &&
       checks.complete &&
+      (!record.usageMemory.reviewRequired ||
+          record.usageMemory.luggageMemos.every(
+            (m) => checks.collectedSpaces.contains(m.space),
+          )) &&
       EvidenceCategory.values.every((c) => photosFor(c).isNotEmpty);
   List<EvidencePhoto> photosFor(EvidenceCategory c) =>
       record.photos.where((p) => p.category == c && p.phase == phase).toList();

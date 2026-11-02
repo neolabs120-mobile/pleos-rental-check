@@ -8,11 +8,19 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 data class ReturnLocation(val name: String, val address: String, val latitude: Double, val longitude: Double,
-    val instructions: String = "", val isTest: Boolean = false) {
+    val instructions: String = "", val isTest: Boolean = false, val parkingSteps: List<ParkingStep> = emptyList(),
+    val chargingStops: List<ChargingStop> = emptyList()) {
     init {
         require(name.isNotBlank() && name.length <= 80 && address.isNotBlank() && address.length <= 200)
-        require(validCoordinates(latitude, longitude) && instructions.length <= 400)
+        require(validCoordinates(latitude, longitude) && instructions.length <= 400 && parkingSteps.size <= 4 && chargingStops.size <= 3)
     }
+}
+
+data class ParkingStep(val title: String, val detail: String, val imageBase64: String? = null) {
+    init { require(title.isNotBlank() && title.length <= 60 && detail.isNotBlank() && detail.length <= 300 && (imageBase64?.length ?: 0) <= 400_000) }
+}
+data class ChargingStop(val name: String, val address: String, val latitude: Double, val longitude: Double) {
+    init { require(name.isNotBlank() && name.length <= 80 && address.isNotBlank() && address.length <= 200 && validCoordinates(latitude, longitude)) }
 }
 
 data class LocationFix(val latitude: Double, val longitude: Double, val timestampMillis: Long) {
@@ -41,8 +49,11 @@ data class ReturnGuideState(val destination: ReturnLocation? = null, val fix: Lo
 }
 
 data class RouteProgress(val target: ReturnLocation, val completed: Boolean = false, val matched: Boolean = false,
-    val started: Boolean = false, val guidanceActive: Boolean = false, val existingRoute: Boolean = false) {
-    val confirmed: Boolean get() = matched && (completed || ((started || existingRoute) && guidanceActive))
+    val started: Boolean = false, val guidanceActive: Boolean = false, val existingRoute: Boolean = false,
+    val via: ChargingStop? = null, val waypointMatched: Boolean = false, val waypointReceived: Boolean = false) {
+    val confirmed: Boolean get() = matched && (completed || ((started || existingRoute) && guidanceActive)) && (via == null || waypointMatched)
+    val waypointUnverified: Boolean get() = via != null && waypointReceived && !waypointMatched && matched &&
+        (completed || ((started || existingRoute) && guidanceActive))
     // Ignore unrelated destination broadcasts; completion alone must not claim our requested return route was installed.
     fun destination(latitude: Double, longitude: Double, present: Boolean = true) = copy(matched = present && validCoordinates(latitude, longitude) &&
         straightDistance(latitude, longitude, target.latitude, target.longitude) <= 50)
@@ -55,7 +66,11 @@ sealed interface GuideEvent {
 }
 interface ReturnGuideEngine {
     fun start(destination: ReturnLocation, receive: (GuideEvent) -> Unit)
+    // Reconnect with the same explicitly approved waypoint expectation after Navigation temporarily owns the foreground.
+    fun startWithWaypoint(destination: ReturnLocation, via: ChargingStop?, receive: (GuideEvent) -> Unit) = start(destination, receive)
     fun navigate()
+    // Optional waypoint requests fail explicitly unless the SDK engine implements real route and waypoint confirmation.
+    fun navigateVia(stop: ChargingStop) { error("충전 경유 안내를 지원하지 않아요.") }
     fun openNavigation()
     fun stop()
 }
@@ -66,6 +81,9 @@ class ReturnGuideController(private val engine: ReturnGuideEngine, private val s
     private var identity: String? = null
     private var generation = 0
     private var ticking: Job? = null
+    private var approvalKey: String? = null
+    private var approvedVia: ChargingStop? = null
+    private var approvedDestination: ReturnLocation? = null
 
     // Scope foreground subscriptions to one approved booking and destination; changing either clears all previous live coordinates and callbacks.
     fun attach(key: String?, place: ReturnLocation?) {
@@ -73,8 +91,9 @@ class ReturnGuideController(private val engine: ReturnGuideEngine, private val s
         generation++; ticking?.cancel(); engine.stop(); identity = key
         state = ReturnGuideState(destination = place, nowMillis = clock()); changed(state)
         if (key == null || place == null) return
+        if (approvalKey != key || approvedDestination != place) { approvalKey = key; approvedDestination = place; approvedVia = null }
         val token = generation
-        engine.start(place) { event ->
+        engine.startWithWaypoint(place, approvedVia) { event ->
             if (token == generation) {
                 state = when (event) {
                     is GuideEvent.Position -> state.copy(fix = event.fix, locationMessage = if (event.fix == null)
@@ -89,9 +108,11 @@ class ReturnGuideController(private val engine: ReturnGuideEngine, private val s
     }
 
     // Only a live, initialized booking session can forward an explicitly confirmed route request.
-    fun navigate() {
+    fun navigate(stop: ChargingStop? = null) {
         check(identity != null && state.destination != null && state.navigation.connected && !state.navigation.busy)
-        engine.navigate()
+        if (stop != null) check(stop in state.destination!!.chargingStops)
+        approvalKey = identity; approvedDestination = state.destination; approvedVia = stop
+        if (stop == null) engine.navigate() else engine.navigateVia(stop)
     }
 
     // Opening the actual Navigation app is separate from claiming that a route or arrival was verified.

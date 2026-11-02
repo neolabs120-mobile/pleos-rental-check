@@ -43,9 +43,8 @@ class _SignupScreenState extends State<SignupScreen> with ActionState {
                   labelText: '닉네임',
                   counterText: '',
                 ),
-                validator:
-                    (v) =>
-                        v == null || v.trim().isEmpty ? '닉네임을 입력해 주세요.' : null,
+                validator: (v) =>
+                    v == null || v.trim().isEmpty ? '닉네임을 입력해 주세요.' : null,
               ),
               const SizedBox(height: 20),
               emailField(email),
@@ -73,8 +72,8 @@ class _SignupScreenState extends State<SignupScreen> with ActionState {
               onChanged: busy ? null : (v) => setState(() => terms = v!),
             ),
             TextButton(
-              onPressed:
-                  () => openPage(context, const PolicyScreen(privacy: false)),
+              onPressed: () =>
+                  openPage(context, const PolicyScreen(privacy: false)),
               child: const Text('이용약관 보기'),
             ),
             CheckboxListTile(
@@ -85,8 +84,8 @@ class _SignupScreenState extends State<SignupScreen> with ActionState {
               onChanged: busy ? null : (v) => setState(() => privacy = v!),
             ),
             TextButton(
-              onPressed:
-                  () => openPage(context, const PolicyScreen(privacy: true)),
+              onPressed: () =>
+                  openPage(context, const PolicyScreen(privacy: true)),
               child: const Text('개인정보 안내 보기'),
             ),
           ],
@@ -111,14 +110,13 @@ class _SignupScreenState extends State<SignupScreen> with ActionState {
             confirm.clear();
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(
-                builder:
-                    (_) => VerificationScreen(
-                      challenge: EmailChallenge.fromJson(
-                        result,
-                        email: email.text.trim(),
-                        isReset: false,
-                      ),
-                    ),
+                builder: (_) => VerificationScreen(
+                  challenge: EmailChallenge.fromJson(
+                    result,
+                    email: email.text.trim(),
+                    isReset: false,
+                  ),
+                ),
               ),
             );
           });

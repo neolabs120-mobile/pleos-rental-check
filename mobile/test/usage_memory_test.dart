@@ -24,7 +24,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(home: Scaffold(body: UsageMemoryNotice(memory))),
     );
-    expect(find.textContaining('내가 저장한 짐 메모: 트렁크 · 캐리어'), findsOneWidget);
+    expect(find.textContaining('트렁크 · 캐리어'), findsOneWidget);
     expect(find.textContaining('기록된 장소가 없어요'), findsNothing);
     expect(find.textContaining('물건 감지 결과가 아니에요'), findsOneWidget);
   });

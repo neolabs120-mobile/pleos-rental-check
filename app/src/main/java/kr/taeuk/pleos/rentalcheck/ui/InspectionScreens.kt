@@ -164,7 +164,8 @@ fun RentalCheckScreen(state: InspectionUiState, onEvent: (InspectionEvent) -> Un
     if (state.stage in listOf(InspectionStage.RETURN, InspectionStage.EVIDENCE) && !state.busy &&
         state.returnWindowDialog == null && (state.returnOccupiedSeats.isNotEmpty() || state.returnMemoNotice)) {
         ReturnSeatNotice(state.returnOccupiedSeats, state.returnSeatSpeech, onEvent,
-            if (state.returnMemoNotice) state.assistance.memory.luggageMemos else emptyList())
+            if (state.returnMemoNotice) state.assistance.memory.luggageMemos else emptyList(),
+            state.assistance.memory.collectedSpaces, state.stage == InspectionStage.RETURN)
     }
     selectedDetail?.let { name ->
         ModalBottomSheet(onDismissRequest = { selectedDetail = null }) {

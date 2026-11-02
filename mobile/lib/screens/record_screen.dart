@@ -1,3 +1,4 @@
+import '../ui/battery_return_notice.dart';
 import 'package:flutter/material.dart';
 
 import '../app_scope.dart';
@@ -26,8 +27,9 @@ class _RecordScreenState extends State<RecordScreen> with ActionState {
   }
 
   Future<void> load() async {
-    final r = await RentalScope.of(context).api
-        .record(widget.booking.rentalId!);
+    final r = await RentalScope.of(
+      context,
+    ).api.record(widget.booking.rentalId!);
     if (mounted) setState(() => record = r);
   }
 
@@ -45,8 +47,9 @@ class _RecordScreenState extends State<RecordScreen> with ActionState {
         const SizedBox(height: 8),
         Text(
           value,
-          style: Theme.of(context).textTheme.titleLarge
-              ?.copyWith(fontWeight: FontWeight.bold),
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
         ),
       ],
     ),
@@ -75,7 +78,12 @@ class _RecordScreenState extends State<RecordScreen> with ActionState {
           if (widget.booking.returnLocation != null)
             Panel(child: ReturnLocationNotice(widget.booking.returnLocation!)),
           if (r.isDemo) Notice(r.demoNotice),
-          if (r.returnAt != null) UsageMemoryNotice(r.usageMemory),
+          if (r.returnAt != null)
+            UsageMemoryNotice(
+              r.usageMemory,
+              collected: r.checksFor('return').collectedSpaces.toSet(),
+            ),
+          if (r.returnAt != null) BatteryReturnNotice(r.batteryReturn),
           if (r.isSubmitted)
             Panel(
               child: Column(

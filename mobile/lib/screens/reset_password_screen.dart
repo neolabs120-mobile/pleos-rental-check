@@ -43,14 +43,13 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
             if (!context.mounted) return;
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(
-                builder:
-                    (_) => VerificationScreen(
-                      challenge: EmailChallenge.fromJson(
-                        r,
-                        email: email.text.trim(),
-                        isReset: true,
-                      ),
-                    ),
+                builder: (_) => VerificationScreen(
+                  challenge: EmailChallenge.fromJson(
+                    r,
+                    email: email.text.trim(),
+                    isReset: true,
+                  ),
+                ),
               ),
             );
           });

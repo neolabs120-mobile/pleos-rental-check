@@ -61,6 +61,7 @@ internal fun ReturnLocationCard(state: InspectionUiState, onEvent: (InspectionEv
                 TextButton(onClick = { details = true }, modifier = Modifier.heightIn(min = 52.dp)) { Text("장소 · 위치 안내") }
             }
             Spacer(Modifier.height(12.dp)); Muted(guide.navigation.message)
+            BatteryPreparation(state, onEvent)
         }
     }
     confirmation?.let { selected -> AlertDialog(onDismissRequest = { confirmation = null },
@@ -77,6 +78,7 @@ internal fun ReturnLocationCard(state: InspectionUiState, onEvent: (InspectionEv
         Column(Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(place.name, style = MaterialTheme.typography.titleMedium); Text(place.address)
             if (place.instructions.isNotBlank()) Text(place.instructions)
+            ParkingPreparation(place)
             if (place.isTest) Text("에뮬레이터용 시험 장소이며 실제 반납 거점이 아니에요.")
             Text("최근 1분 이내 차량 위치로 직선거리를 계산해요. 주행 거리나 주차구역 도착을 확인하는 값이 아니며 자동 반납하지 않아요.")
             Text("차량 위치는 이 앱이 화면에 열려 있는 동안만 사용하며 서버에 보내거나 반납 기록에 저장하지 않아요.")

@@ -225,13 +225,13 @@ class AccountTests(unittest.TestCase):
         response = self.client.post('/api/device/bookings', json=body, headers=self.device)
         self.assertEqual(200, response.status_code, response.text)
         invite = response.json()
-        self.assertEqual(place, self.client.get('/api/account/bookings', headers=auth).json()['bookings'][0]['returnLocation'])
+        self.assertEqual({**place, 'parkingSteps': [], 'chargingStops': []}, self.client.get('/api/account/bookings', headers=auth).json()['bookings'][0]['returnLocation'])
         self.assertEqual([], self.client.get('/api/account/bookings', headers=outsider).json()['bookings'])
         pair, token = self.pair()
         path = '/api/device/pairings/' + pair['id']
         self.assertNotIn('returnLocation', self.client.get(path, headers=self.device).json())
         self.assertEqual(200, self.approve(invite, token, auth).status_code)
-        self.assertEqual(place, self.client.get(path, headers=self.device).json()['returnLocation'])
+        self.assertEqual({**place, 'parkingSteps': [], 'chargingStops': []}, self.client.get(path, headers=self.device).json()['returnLocation'])
 
     def test_return_location_rejects_invalid_coordinates_labels_and_unmarked_tests(self):
         # Invalid or partial destinations must fail validation before any invitation is stored; non-finite values cannot become zero.

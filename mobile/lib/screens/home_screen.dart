@@ -1,3 +1,4 @@
+import '../ui/draft_resume.dart';
 import 'package:flutter/material.dart';
 
 import '../app_scope.dart';
@@ -249,8 +250,9 @@ class _HomeScreenState extends State<HomeScreen> with ActionState {
               children: [
                 Text(
                   '${state.user!.nickname}님, 반가워요',
-                  style: Theme.of(context).textTheme.titleLarge
-                      ?.copyWith(fontWeight: FontWeight.w800),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 8),
                 const Text('예약한 이메일의 차량이 자동으로 보여요.'),
@@ -276,14 +278,16 @@ class _HomeScreenState extends State<HomeScreen> with ActionState {
               busy: busy,
               onPressed: resumeUpload,
             ),
+          if (tab == 0) const DraftResume(),
           if (tab == 0)
             Row(
               children: [
                 Expanded(
                   child: Text(
                     '이용할 예약',
-                    style: Theme.of(context).textTheme.titleLarge
-                        ?.copyWith(fontWeight: FontWeight.w700),
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
                 Text('${rows.length}건'),

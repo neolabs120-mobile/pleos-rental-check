@@ -37,8 +37,39 @@ class RentalController extends ChangeNotifier {
             DateTime.now().millisecondsSinceEpoch <
                 (session['expiresAtMillis'] as num)) {
           api.accountToken = session['token'] as String;
-          user = await api.me();
-          bookings = await api.bookings();
+          try {
+            user = await api.me();
+            await store.write(
+              'session',
+              jsonEncode({
+                ...session,
+                'user': {
+                  'id': user!.id,
+                  'email': user!.email,
+                  'nickname': user!.nickname,
+                },
+              }),
+            );
+            bookings = await api.bookings();
+            await store.write(
+              'bookings_${api.base.origin}_${user!.id}',
+              jsonEncode(bookings.map((b) => b.toJson()).toList()),
+            );
+          } on ApiException catch (error) {
+            if (error.status != 0 ||
+                (user == null && session['user'] is! Json)) {
+              rethrow;
+            }
+            user ??= AccountUser.fromJson(session['user'] as Json);
+            final saved = await store.read(
+              'bookings_${api.base.origin}_${user!.id}',
+            );
+            bookings = (jsonDecode(saved ?? '[]') as List)
+                .map((v) => Booking.fromJson(v as Json))
+                .toList();
+            startupError =
+                '서버에 연결하지 못했어요. 이 기기의 작성 중인 사진은 이어 쓸 수 있어요. 최종 접수는 연결 후 가능해요.';
+          }
         } else {
           await store.delete('session');
         }
@@ -61,6 +92,7 @@ class RentalController extends ChangeNotifier {
       'session',
       jsonEncode({
         'token': r['token'],
+        'user': r['user'],
         'origin': api.base.origin,
         'expiresAtMillis': r['expiresAtMillis'],
       }),
@@ -74,6 +106,12 @@ class RentalController extends ChangeNotifier {
 
   Future<void> refreshBookings() async {
     bookings = await api.bookings();
+    if (user != null) {
+      await store.write(
+        'bookings_${api.base.origin}_${user!.id}',
+        jsonEncode(bookings.map((b) => b.toJson()).toList()),
+      );
+    }
     notifyListeners();
   }
 

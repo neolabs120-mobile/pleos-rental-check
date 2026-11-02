@@ -4,8 +4,15 @@ import 'components.dart';
 
 class UsageMemoryNotice extends StatelessWidget {
   // Present the vehicle's observed spaces beside the user's own luggage marks without replacing any required return photo or check.
-  const UsageMemoryNotice(this.memory, {super.key});
+  const UsageMemoryNotice(
+    this.memory, {
+    super.key,
+    this.collected,
+    this.onCollected,
+  });
   final UsageMemory memory;
+  final Set<String>? collected;
+  final void Function(String, bool)? onCollected;
 
   @override
   // Make incomplete monitoring explicit so an empty history can never be read as an automatic all-clear for belongings.
@@ -23,12 +30,21 @@ class UsageMemoryNotice extends StatelessWidget {
           Text(
             '내가 짐을 뒀다고 표시한 곳: ${memory.marked.map((s) => UsageMemory.labels[s]!).join(', ')}',
           ),
+        if (memory.luggageMemos.isNotEmpty)
+          Text(
+            '${memory.luggageMemos.where((m) => (collected ?? memory.collectedSpaces.toSet()).contains(m.space)).length}/${memory.luggageMemos.length}개 챙김 확인',
+          ),
         for (final memo in memory.luggageMemos)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              '내가 저장한 짐 메모: ${UsageMemory.labels[memo.space]} · ${memo.item}',
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text('${UsageMemory.labels[memo.space]} · ${memo.item}'),
+            subtitle: const Text('직접 살펴본 뒤 챙겼어요'),
+            value: (collected ?? memory.collectedSpaces.toSet()).contains(
+              memo.space,
             ),
+            onChanged: onCollected == null
+                ? null
+                : (value) => onCollected!(memo.space, value!),
           ),
         if (memory.opened.isEmpty &&
             memory.marked.isEmpty &&

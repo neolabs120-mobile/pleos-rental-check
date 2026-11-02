@@ -47,14 +47,13 @@ class _SettingsScreenState extends State<SettingsScreen> with ActionState {
       PrimaryAction(
         '주소 저장',
         busy: busy,
-        onPressed:
-            () => run(() async {
-              await RentalScope.of(context).configureServer(address.text);
-              if (context.mounted) {
-                Navigator.of(context).popUntil((r) => r.isFirst);
-                toast(context, '서버 주소를 저장했어요.');
-              }
-            }),
+        onPressed: () => run(() async {
+          await RentalScope.of(context).configureServer(address.text);
+          if (context.mounted) {
+            Navigator.of(context).popUntil((r) => r.isFirst);
+            toast(context, '서버 주소를 저장했어요.');
+          }
+        }),
       ),
     ],
   );

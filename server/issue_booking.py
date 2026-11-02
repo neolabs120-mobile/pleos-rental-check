@@ -2,6 +2,7 @@
 import argparse
 import json
 import os
+from pathlib import Path
 import urllib.request
 
 if __name__ == '__main__':
@@ -11,6 +12,7 @@ if __name__ == '__main__':
     parser.add_argument('--vin', required=True)
     parser.add_argument('--vehicle-name', default='대여 차량')
     parser.add_argument('--demo', action='store_true', help='Mark this invitation as a test booking; owner approval is still required for emulator VIN records')
+    parser.add_argument('--return-guide-json', type=Path, help='Operator-issued complete return location JSON including parkingSteps and chargingStops')
     parser.add_argument('--return-name')
     parser.add_argument('--return-address')
     parser.add_argument('--return-latitude', type=float)
@@ -28,6 +30,13 @@ if __name__ == '__main__':
         parser.error('--return-test는 --demo와 반납 장소가 필요합니다.')
     destination = None if args.return_name is None else dict(name=args.return_name, address=args.return_address,
         latitude=args.return_latitude, longitude=args.return_longitude, instructions=args.return_instructions, isTest=args.return_test)
+    if args.return_guide_json:
+        if any(value is not None for value in fields) or args.return_test:
+            parser.error('--return-guide-json과 개별 장소 옵션은 함께 사용할 수 없습니다.')
+        if args.return_guide_json.stat().st_size > 2_000_000:
+            parser.error('주차장 안내 JSON은 2MB 이하로 지정하세요.')
+        from return_location import ReturnLocation
+        destination = ReturnLocation.model_validate_json(args.return_guide_json.read_text()).model_dump()
     request = urllib.request.Request(args.base_url.rstrip('/')+'/api/device/bookings', method='POST',
         headers={'Authorization':'Bearer '+token,'Content-Type':'application/json'},
         data=json.dumps({'email':args.email,'vin':args.vin.upper(),'vehicleName':args.vehicle_name,'isDemo':args.demo,'returnLocation':destination}).encode())

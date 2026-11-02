@@ -86,6 +86,14 @@ class TripAssistanceController(context: Context, private val source: VehicleData
         publish()
     }
 
+    // Persist a parked renter's per-item recovery acknowledgement before the return snapshot freezes this memory.
+    fun collectItem(space: StorageSpace, checked: Boolean) {
+        if (bookingId == null || frozen || !foreground) return
+        val previous = state.memory; state = state.copy(memory = previous.collect(space, checked), problem = null)
+        if (!persist()) state = state.copy(memory = previous)
+        publish()
+    }
+
     // Opening the optional guide does not auto-start an exercise, control a vehicle, or mark a manual checklist as complete.
     fun openPractice() { if (bookingId != null && !frozen) { state = state.copy(practiceOpen = true); publish() } }
 

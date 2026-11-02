@@ -73,11 +73,8 @@ class _VerificationScreenState extends State<VerificationScreen>
                 autofillHints: const [AutofillHints.oneTimeCode],
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 decoration: const InputDecoration(labelText: '확인번호 6자리'),
-                validator:
-                    (v) =>
-                        v != null && v.length == 6
-                            ? null
-                            : '확인번호 6자리를 입력해 주세요.',
+                validator: (v) =>
+                    v != null && v.length == 6 ? null : '확인번호 6자리를 입력해 주세요.',
               ),
               if (challenge.isReset) ...[
                 const SizedBox(height: 18),
@@ -97,70 +94,67 @@ class _VerificationScreenState extends State<VerificationScreen>
         PrimaryAction(
           challenge.isReset ? '비밀번호 변경' : '확인하고 가입 완료',
           busy: busy,
-          onPressed:
-              remaining <= 0
-                  ? null
-                  : () {
-                    if (!form.currentState!.validate()) return;
-                    run(() async {
-                      await RentalScope.of(context).api.request(
-                        'POST',
-                        challenge.isReset
-                            ? '/api/auth/password/reset'
-                            : '/api/auth/verify',
-                        auth: Auth.none,
-                        body: {
-                          'challengeId': challenge.id,
-                          'code': code.text,
-                          if (challenge.isReset) 'password': password.text,
-                        },
-                      );
-                      if (!context.mounted) return;
-                      Navigator.of(context).popUntil((r) => r.isFirst);
-                      toast(
-                        context,
-                        challenge.isReset
-                            ? '비밀번호를 바꿨어요. 다시 로그인해 주세요.'
-                            : '가입이 완료됐어요. 로그인해 주세요.',
-                      );
-                      openPage(
-                        context,
-                        LoginScreen(initialEmail: challenge.email),
-                      );
-                    });
-                  },
+          onPressed: remaining <= 0
+              ? null
+              : () {
+                  if (!form.currentState!.validate()) return;
+                  run(() async {
+                    await RentalScope.of(context).api.request(
+                      'POST',
+                      challenge.isReset
+                          ? '/api/auth/password/reset'
+                          : '/api/auth/verify',
+                      auth: Auth.none,
+                      body: {
+                        'challengeId': challenge.id,
+                        'code': code.text,
+                        if (challenge.isReset) 'password': password.text,
+                      },
+                    );
+                    if (!context.mounted) return;
+                    Navigator.of(context).popUntil((r) => r.isFirst);
+                    toast(
+                      context,
+                      challenge.isReset
+                          ? '비밀번호를 바꿨어요. 다시 로그인해 주세요.'
+                          : '가입이 완료됐어요. 로그인해 주세요.',
+                    );
+                    openPage(
+                      context,
+                      LoginScreen(initialEmail: challenge.email),
+                    );
+                  });
+                },
         ),
         OutlinedButton(
-          onPressed:
-              busy || cooldown > 0 || remaining <= 0
-                  ? null
-                  : () => run(() async {
-                    final r = await RentalScope.of(context).api.request(
-                      'POST',
-                      '/api/auth/resend',
-                      auth: Auth.none,
-                      body: {'challengeId': challenge.id},
-                    );
-                    if (context.mounted) {
-                      setState(() {
-                        challenge = EmailChallenge.fromJson(
-                          r,
-                          email: challenge.email,
-                          isReset: challenge.isReset,
-                        );
-                        code.clear();
-                      });
-                    }
-                  }),
+          onPressed: busy || cooldown > 0 || remaining <= 0
+              ? null
+              : () => run(() async {
+                  final r = await RentalScope.of(context).api.request(
+                    'POST',
+                    '/api/auth/resend',
+                    auth: Auth.none,
+                    body: {'challengeId': challenge.id},
+                  );
+                  if (context.mounted) {
+                    setState(() {
+                      challenge = EmailChallenge.fromJson(
+                        r,
+                        email: challenge.email,
+                        isReset: challenge.isReset,
+                      );
+                      code.clear();
+                    });
+                  }
+                }),
           child: Text(
             cooldown > 0 ? '다시 받기 · ${cooldown + 1}초 후' : '확인번호 다시 받기',
           ),
         ),
         TextButton(
-          onPressed:
-              busy
-                  ? null
-                  : () => Navigator.of(context).popUntil((r) => r.isFirst),
+          onPressed: busy
+              ? null
+              : () => Navigator.of(context).popUntil((r) => r.isFirst),
           child: const Text('처음으로 돌아가기'),
         ),
       ],

@@ -48,10 +48,9 @@ class _RentalCheckAppState extends State<RentalCheckApp> {
     return ThemeData(
       useMaterial3: true,
       colorScheme: colors,
-      scaffoldBackgroundColor:
-          brightness == Brightness.light
-              ? const Color(0xFFF5F8F7)
-              : const Color(0xFF111B1A),
+      scaffoldBackgroundColor: brightness == Brightness.light
+          ? const Color(0xFFF5F8F7)
+          : const Color(0xFF111B1A),
       appBarTheme: const AppBarTheme(
         centerTitle: false,
         scrolledUnderElevation: 0,

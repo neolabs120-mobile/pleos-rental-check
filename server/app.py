@@ -4,6 +4,8 @@ No payment, fleet-management UI, or public deployment is included.
 """
 from __future__ import annotations
 
+from return_battery import battery_summary
+
 import base64
 import hashlib
 import io
@@ -87,6 +89,8 @@ class UsageMemory(StrictModel):
     markedSpaces: list[Literal["FRONT_LEFT", "FRONT_RIGHT", "REAR_LEFT", "REAR_RIGHT", "TRUNK"]] = Field(default_factory=list, max_length=5)
     monitoringGaps: bool = True
     luggageMemos: list[LuggageMemo] = Field(default_factory=list, max_length=5)
+    collectedSpaces: list[Literal["FRONT_LEFT", "FRONT_RIGHT", "REAR_LEFT", "REAR_RIGHT", "TRUNK"]] = Field(default_factory=list, max_length=5)
+    luggageReviewRequired: bool = False
 
     @model_validator(mode="after")
     def unique_spaces(self):
@@ -95,6 +99,8 @@ class UsageMemory(StrictModel):
             raise ValueError("사용 공간은 중복 없이 기록해야 합니다.")
         if len(self.luggageMemos) != len({memo.space for memo in self.luggageMemos}):
             raise ValueError("같은 장소의 물건 메모는 하나로 정리해 주세요.")
+        if len(self.collectedSpaces) != len(set(self.collectedSpaces)) or not set(self.collectedSpaces) <= {m.space for m in self.luggageMemos}:
+            raise ValueError("챙김 확인은 등록한 짐 메모의 장소만 지정할 수 있습니다.")
         return self
 
 
@@ -120,6 +126,7 @@ class PhotoUpload(StrictModel):
 
 
 class Checklist(StrictModel):
+    collectedSpaces: list[Literal["FRONT_LEFT", "FRONT_RIGHT", "REAR_LEFT", "REAR_RIGHT", "TRUNK"]] = Field(default_factory=list, max_length=5)
     windows: bool = False
     belongings: bool = False
     exterior: bool = False
@@ -281,13 +288,17 @@ def create_app(data_dir: Path, device_token: str, public_base_url: str, clock=ti
         payload = json.loads(row["payload"])
         photo_rows = connection.execute("SELECT id, phase, category, sha256, created_at FROM photos WHERE rental_id=? ORDER BY created_at,id", (rental_id,)).fetchall()
         checks = {r["phase"]: json.loads(r["payload"]) for r in connection.execute("SELECT phase,payload FROM checks WHERE rental_id=?", (rental_id,))}
+        memory = UsageMemory.model_validate(payload.get("usageMemory", {}))
+        checks.setdefault("return", {**Checklist().model_dump(), "collectedSpaces": memory.collectedSpaces})
+        checks["return"].setdefault("collectedSpaces", memory.collectedSpaces)
         vin = Snapshot.model_validate(payload["pickup"]).vin()
         return {"id": rental_id, "revision": row["revision"], "vinSuffix": vin[-6:],
             "isDemo": payload["pickup"]["source"] in {"DEMO · 합성 차량 데이터", EMULATOR_TEST_SOURCE},
             "usesTestVin": payload["pickup"]["source"] == EMULATOR_TEST_SOURCE,
-            "usageMemory": UsageMemory.model_validate(payload.get("usageMemory", {})).model_dump(),
+            "usageMemory": memory.model_dump(), "batteryReturn": battery_summary(payload),
             "submittedAtMillis": row["submitted_at"], "receiptId": row["receipt_id"],
             "photos": [{"id": p["id"], "phase": p["phase"], "category": p["category"], "sha256": p["sha256"], "createdAtMillis": p["created_at"]} for p in photo_rows if phase is None or p["phase"] == phase],
+            "pickupPhotos": [{"id": p["id"], "phase": p["phase"], "category": p["category"]} for p in photo_rows if p["phase"] == "pickup"] if phase == "return" else [],
             "checks": checks if phase is None else checks.get(phase, Checklist().model_dump())}
 
     accounts = Accounts(app, db, millis, authorize, public_base_url, summary, mailer)
@@ -420,6 +431,10 @@ def create_app(data_dir: Path, device_token: str, public_base_url: str, clock=ti
             active = connection.execute("SELECT * FROM grants WHERE hash=?", (grant["hash"],)).fetchone()
             if row["submitted_at"] or active["revoked"] or active["expires_at"] <= millis():
                 raise HTTPException(409, "전송 링크가 종료됐습니다.")
+            # Only the current rental's reviewed notes may be acknowledged; this cannot claim sensor detection or another booking's items.
+            memory = UsageMemory.model_validate(json.loads(row["payload"]).get("usageMemory", {}))
+            if len(body.collectedSpaces) != len(set(body.collectedSpaces)) or not set(body.collectedSpaces) <= {m.space for m in memory.luggageMemos}:
+                raise HTTPException(422, "이 예약에 등록된 짐 메모만 확인해 주세요.")
             connection.execute("INSERT INTO checks VALUES(?,?,?) ON CONFLICT(rental_id,phase) DO UPDATE SET payload=excluded.payload", (grant["rental_id"], grant["phase"], canonical(body.model_dump())))
         return {"saved": True}
 
@@ -462,6 +477,10 @@ def create_app(data_dir: Path, device_token: str, public_base_url: str, clock=ti
                 raise HTTPException(409, "같은 차량의 인수·반납 기록이 필요합니다.")
             checked = connection.execute("SELECT payload FROM checks WHERE rental_id=? AND phase='return'", (identifier,)).fetchone()
             checks = json.loads(checked[0]) if checked else {}
+            # New reviewed-note records require explicit per-item confirmation; legacy clients keep their original submission contract.
+            collected = checks.get("collectedSpaces", payload.usageMemory.collectedSpaces)
+            if payload.usageMemory.luggageReviewRequired and not {m.space for m in payload.usageMemory.luggageMemos} <= set(collected):
+                raise HTTPException(409, "저장한 짐을 항목별로 챙겼는지 확인해 주세요.")
             counts = {r[0]: r[1] for r in connection.execute("SELECT category,count(*) FROM photos WHERE rental_id=? AND phase='return' GROUP BY category", (identifier,))}
             if any(not checks.get(c) or counts.get(c, 0) < 1 for c in CATEGORIES):
                 raise HTTPException(409, "창문·소지품·외관의 사진과 직접 확인 내역이 모두 필요합니다.")

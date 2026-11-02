@@ -96,7 +96,12 @@ class RentalServer(private val settings: () -> ServerConfig, private val store: 
                     require(kr.taeuk.pleos.rentalcheck.model.VehicleIdentity.normalize(it) == it) { "연결 차량 VIN 형식이 올바르지 않습니다." }
                 }, json.optJSONObject("returnLocation")?.let { place -> kr.taeuk.pleos.rentalcheck.navigation.ReturnLocation(
                     place.getString("name"), place.getString("address"), place.getDouble("latitude"), place.getDouble("longitude"),
-                    place.optString("instructions", ""), place.optBoolean("isTest", false)) }) else null)
+                    place.optString("instructions", ""), place.optBoolean("isTest", false),
+                    (0 until (place.optJSONArray("parkingSteps")?.length() ?: 0)).map { i -> val step = place.getJSONArray("parkingSteps").getJSONObject(i)
+                        kr.taeuk.pleos.rentalcheck.navigation.ParkingStep(step.getString("title"), step.getString("detail"),
+                            if (step.isNull("imageBase64")) null else step.getString("imageBase64")) },
+                    (0 until (place.optJSONArray("chargingStops")?.length() ?: 0)).map { i -> val stop = place.getJSONArray("chargingStops").getJSONObject(i)
+                        kr.taeuk.pleos.rentalcheck.navigation.ChargingStop(stop.getString("name"), stop.getString("address"), stop.getDouble("latitude"), stop.getDouble("longitude")) }) }) else null)
         }
         fun parseSummary(json: JSONObject, expectedId: String): CloudSummary {
             require(json.getString("id") == expectedId) { "다른 이용 기록의 서버 응답입니다." }

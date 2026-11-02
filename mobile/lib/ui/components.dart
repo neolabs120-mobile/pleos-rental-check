@@ -15,12 +15,11 @@ mixin ActionState<T extends StatefulWidget> on State<T> {
     } catch (e) {
       if (mounted) {
         setState(
-          () =>
-              error = switch (e) {
-                ApiException() => e.message,
-                FormatException() => e.message,
-                _ => '작업을 완료하지 못했어요. 다시 시도해 주세요.',
-              },
+          () => error = switch (e) {
+            ApiException() => e.message,
+            FormatException() => e.message,
+            _ => '작업을 완료하지 못했어요. 다시 시도해 주세요.',
+          },
         );
       }
     } finally {
@@ -72,13 +71,12 @@ class AppPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: Text(title), actions: actions),
       body: SafeArea(child: body),
-      bottomNavigationBar:
-          bottom == null
-              ? null
-              : SafeArea(
-                minimum: const EdgeInsets.fromLTRB(24, 12, 24, 16),
-                child: bottom!,
-              ),
+      bottomNavigationBar: bottom == null
+          ? null
+          : SafeArea(
+              minimum: const EdgeInsets.fromLTRB(24, 12, 24, 16),
+              child: bottom!,
+            ),
     );
   }
 }
@@ -136,10 +134,9 @@ class Notice extends StatelessWidget {
           children: [
             Icon(
               isError ? Icons.error_outline : Icons.info_outline,
-              color:
-                  isError
-                      ? colors.onErrorContainer
-                      : colors.onSecondaryContainer,
+              color: isError
+                  ? colors.onErrorContainer
+                  : colors.onSecondaryContainer,
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -147,10 +144,9 @@ class Notice extends StatelessWidget {
                 text,
                 style: TextStyle(
                   height: 1.5,
-                  color:
-                      isError
-                          ? colors.onErrorContainer
-                          : colors.onSecondaryContainer,
+                  color: isError
+                      ? colors.onErrorContainer
+                      : colors.onSecondaryContainer,
                 ),
               ),
             ),
@@ -228,10 +224,9 @@ class _PasswordFieldState extends State<PasswordField> {
     decoration: InputDecoration(
       labelText: widget.label,
       counterText: '',
-      helperText:
-          widget.newPassword && widget.confirm == null
-              ? '12자 이상 입력해 주세요'
-              : null,
+      helperText: widget.newPassword && widget.confirm == null
+          ? '12자 이상 입력해 주세요'
+          : null,
       suffixIcon: IconButton(
         tooltip: hidden ? '비밀번호 보기' : '비밀번호 숨기기',
         onPressed: () => setState(() => hidden = !hidden),
@@ -258,11 +253,10 @@ Widget emailField(TextEditingController controller) => TextFormField(
   autofillHints: const [AutofillHints.email],
   autocorrect: false,
   decoration: const InputDecoration(labelText: '이메일', counterText: ''),
-  validator:
-      (v) =>
-          v != null && RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(v.trim())
-              ? null
-              : '올바른 이메일을 입력해 주세요.',
+  validator: (v) =>
+      v != null && RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(v.trim())
+      ? null
+      : '올바른 이메일을 입력해 주세요.',
 );
 
 String dateLabel(DateTime? value) {
@@ -275,10 +269,9 @@ String dateLabel(DateTime? value) {
 String amount(double? value, String unit) =>
     value == null ? '미수신' : '${value.toStringAsFixed(1)}$unit';
 
-void toast(BuildContext context, String text) =>
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(text)));
+void toast(BuildContext context, String text) => ScaffoldMessenger.of(context)
+  ..hideCurrentSnackBar()
+  ..showSnackBar(SnackBar(content: Text(text)));
 
 Future<T?> openPage<T>(BuildContext context, Widget page) =>
     Navigator.of(context).push<T>(MaterialPageRoute(builder: (_) => page));

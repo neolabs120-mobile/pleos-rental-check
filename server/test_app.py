@@ -123,7 +123,7 @@ class RentalApiTests(unittest.TestCase):
     def test_usage_memory_is_preserved_in_owner_and_photo_views(self):
         # Observed places and explicit marks must travel with the return without satisfying mandatory photos or checks.
         payload = copy.deepcopy(self.payload)
-        memory = {"openedSpaces": ["REAR_RIGHT", "TRUNK"], "markedSpaces": ["TRUNK"], "monitoringGaps": True, "luggageMemos": []}
+        memory = {"openedSpaces": ["REAR_RIGHT", "TRUNK"], "markedSpaces": ["TRUNK"], "monitoringGaps": True, "luggageMemos": [], "collectedSpaces": [], "luggageReviewRequired": False}
         payload["usageMemory"] = memory
         self.assertEqual(memory, self.save(payload)["usageMemory"])
         owner = self.client.get('/api/account/rentals/' + self.id, headers=self.account_auth)
@@ -339,6 +339,41 @@ class RentalApiTests(unittest.TestCase):
         self.save()
         body=copy.deepcopy(self.payload);body['bookingId']=self.booking();body['revision']=3
         self.assertEqual(409,self.client.put('/api/rentals/'+self.id,json=body,headers=self.auth).status_code)
+
+
+    def test_reviewed_items_require_per_item_confirmation_and_preserve_retry(self):
+        # Photos and a general belongings check cannot silently acknowledge the newly reviewed item list.
+        payload = copy.deepcopy(self.payload)
+        payload['usageMemory'] = dict(luggageMemos=[dict(space='TRUNK', item='캐리어')], luggageReviewRequired=True)
+        self.save(payload); auth = self.link(); self.complete(auth)
+        self.assertEqual(409, self.client.post('/api/upload/submit', json={'revision':2}, headers=auth).status_code)
+        body = dict(windows=True, belongings=True, exterior=True, collectedSpaces=['TRUNK'])
+        self.assertEqual(200, self.client.put('/api/upload/checks', json=body, headers=auth).status_code)
+        first = self.client.post('/api/upload/submit', json={'revision':2}, headers=auth)
+        self.assertEqual(200, first.status_code, first.text)
+        self.assertEqual(first.json(), self.client.post('/api/upload/submit', json={'revision':2}, headers=auth).json())
+
+    def test_item_confirmation_cannot_reference_other_places_or_change_frozen_notes(self):
+        # Item recovery is a user assertion for an existing note, never an arbitrary location or a way to rewrite returned evidence.
+        payload = copy.deepcopy(self.payload)
+        payload['usageMemory'] = dict(luggageMemos=[dict(space='TRUNK', item='캐리어')], collectedSpaces=['TRUNK'], luggageReviewRequired=True)
+        self.save(payload); auth = self.link()
+        result = self.client.get('/api/upload/session', headers=auth).json()
+        self.assertEqual(['TRUNK'], result['checks']['collectedSpaces'])
+        for invalid in [['FRONT_LEFT'], ['TRUNK','TRUNK']]:
+            self.assertEqual(422, self.client.put('/api/upload/checks', json={'collectedSpaces':invalid}, headers=auth).status_code)
+        payload['revision']=3; payload['usageMemory']['collectedSpaces']=[]
+        self.assertEqual(409, self.client.put('/api/rentals/'+self.id, json=payload, headers=self.auth).status_code)
+
+    def test_battery_reference_is_immutable_pickup_value_and_unknown_stays_unknown(self):
+        # A return percentage never becomes its own target, and failed readings never appear as a zero-percent charge.
+        payload = copy.deepcopy(self.payload)
+        for phase, value in [('pickup','80'),('returned','72.5')]:
+            payload[phase]['readings'].append(dict(key='battery.percent',label='배터리',status='AVAILABLE',value=value,displayValue=value,observedAtMillis=100))
+        result=self.save(payload)['batteryReturn']
+        self.assertEqual(dict(targetPercent=80.0,returnPercent=72.5,shortfallPercent=7.5),result)
+        payload['revision']=3;payload['pickup']['readings'][-1]['value']='70'
+        self.assertEqual(409,self.client.put('/api/rentals/'+self.id,json=payload,headers=self.auth).status_code)
 
 
 if __name__ == "__main__":

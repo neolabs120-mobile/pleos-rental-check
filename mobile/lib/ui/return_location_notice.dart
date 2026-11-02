@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../models/rental_models.dart';
@@ -22,6 +23,29 @@ class ReturnLocationNotice extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.only(top: 6),
           child: Text(place.instructions),
+        ),
+      if (place.parkingSteps.isNotEmpty)
+        ExpansionTile(
+          tilePadding: EdgeInsets.zero,
+          title: const Text('주차장 입구·층·구역 안내'),
+          children: [
+            for (final step in place.parkingSteps) ...[
+              const SizedBox(height: 12),
+              Text(
+                '${place.parkingSteps.indexOf(step) + 1}. ${step['title']}',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              Text(step['detail'] as String),
+              if (step['imageBase64'] is String)
+                Image.memory(
+                  base64Decode(step['imageBase64'] as String),
+                  height: 160,
+                  semanticLabel: '${step['title']} 안내 이미지',
+                  errorBuilder: (_, error, trace) =>
+                      const Text('안내 이미지를 열지 못했어요. 설명을 확인해 주세요.'),
+                ),
+            ],
+          ],
         ),
       if (place.isTest)
         const Padding(

@@ -1,3 +1,7 @@
+import '../ui/battery_return_notice.dart';
+import 'dart:convert';
+import '../data/evidence_drafts.dart';
+import '../ui/photo_guidance.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -14,7 +18,8 @@ import '../ui/secure_photo.dart';
 import 'receipt_screen.dart';
 
 class PhotoDraft {
-  PhotoDraft(this.bytes) : requestId = const Uuid().v4();
+  PhotoDraft(this.bytes, {String? request})
+    : requestId = request ?? const Uuid().v4();
   final Uint8List bytes;
   // Stable across failed attempts; the server can safely deduplicate a retry.
   final String requestId;
@@ -38,6 +43,17 @@ class _EvidenceScreenState extends State<EvidenceScreen> with ActionState {
   final note = TextEditingController();
   bool dirty = false, leaving = false;
   late final Timer ticker;
+  final collected = <String>{};
+  Json? cachedSession;
+  bool offline = false, restored = false;
+  String? localMessage;
+  Timer? debounce;
+  EvidenceDrafts get cache {
+    final state = RentalScope.of(context);
+    return EvidenceDrafts(state.store, state.api.base.origin, state.user!.id);
+  }
+
+  String get draftKey => '${session!.record.id}_${session!.phase}';
   @override
   void initState() {
     super.initState();
@@ -47,8 +63,8 @@ class _EvidenceScreenState extends State<EvidenceScreen> with ActionState {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         run(() async {
-          await load(syncChecks: true);
-          await recoverPhoto();
+          await restoreDraft();
+          if (!offline) await recoverPhoto();
         });
       }
     });
@@ -57,29 +73,143 @@ class _EvidenceScreenState extends State<EvidenceScreen> with ActionState {
   @override
   void dispose() {
     ticker.cancel();
+    debounce?.cancel();
     note.dispose();
     super.dispose();
   }
 
+  // Reconcile only the active account's upload grant; network failure may use a committed local session without authorizing final submission.
   Future<void> load({bool syncChecks = false}) async {
-    final loaded = await RentalScope.of(context).api.uploadSession(token);
+    Json raw;
+    try {
+      raw = await RentalScope.of(context).api.request(
+        'GET',
+        '/api/upload/session',
+        auth: Auth.photo,
+        photoToken: token,
+      );
+      offline = false;
+    } on ApiException catch (error) {
+      if (error.status != 0 || cachedSession == null) rethrow;
+      raw = cachedSession!;
+      offline = true;
+    }
+    final loaded = UploadSession.fromJson(raw);
     if (!mounted) return;
     final phaseChanged = session != null && session!.phase != loaded.phase;
     setState(() {
-      if (phaseChanged) {
-        drafts.clear();
-      }
+      if (phaseChanged) drafts.clear();
       session = loaded;
+      cachedSession = raw;
       if (syncChecks || phaseChanged) {
         for (final c in EvidenceCategory.values) {
           checked[c] = loaded.checks.checked(c);
         }
+        collected
+          ..clear()
+          ..addAll(loaded.checks.collectedSpaces);
         note.text = loaded.checks.note;
         dirty = false;
       }
     });
   }
 
+  // Preserve photos, stable upload identifiers and unsent checks in account-bound encrypted storage before claiming local recovery is available.
+  Future<void> persistDraft() async {
+    if (session == null || cachedSession == null || leaving) return;
+    debounce?.cancel();
+    await cache.save(draftKey, {
+      'token': token,
+      'session': cachedSession,
+      'dirty': dirty,
+      'checks': currentChecks.toJson(),
+      'photos': {
+        for (final e in drafts.entries)
+          e.key.name: {
+            'bytes': base64Encode(e.value.bytes),
+            'requestId': e.value.requestId,
+          },
+      },
+    });
+    if (mounted) {
+      setState(
+        () => localMessage = '기기에 암호화해 임시 저장했어요. 아직 전송하지 않은 내용은 서버 접수와 별개예요.',
+      );
+    }
+  }
+
+  // Restore only the current owner's saved upload token, then reconcile with the server before permitting final submission.
+  Future<void> restoreDraft() async {
+    final index = await cache.list();
+    Json? saved;
+    for (final id in index) {
+      final value = await cache.read(id);
+      if (value?['token'] == token) {
+        saved = value;
+        break;
+      }
+    }
+    cachedSession = saved?['session'] as Json?;
+    await load(syncChecks: true);
+    saved ??= await cache.read(draftKey);
+    if (saved != null &&
+        saved['session']['phase'] == session!.phase &&
+        saved['session']['id'] == session!.record.id) {
+      final checks = ManualChecks.fromJson(saved['checks'] as Json);
+      setState(() {
+        if (saved!['dirty'] == true) {
+          for (final c in EvidenceCategory.values) {
+            checked[c] = checks.checked(c);
+          }
+          collected
+            ..clear()
+            ..addAll(checks.collectedSpaces);
+          note.text = checks.note;
+          dirty = true;
+        }
+        for (final entry in (saved['photos'] as Json).entries) {
+          final bytes = base64Decode(entry.value['bytes'] as String);
+          validatePhoto(bytes);
+          drafts[EvidenceCategory.values.byName(entry.key)] = PhotoDraft(
+            bytes,
+            request: entry.value['requestId'] as String,
+          );
+        }
+        restored = true;
+        localMessage = '기기에 남겨 둔 사진·확인을 복원했어요. 전송 상태를 확인해 주세요.';
+      });
+    }
+    await persistDraft();
+  }
+
+  // Save the latest form after a short typing pause while surfacing a local-storage failure instead of promising recovery that did not occur.
+  void queueDraft() {
+    localMessage = '변경 내용을 기기에 임시 저장 중이에요.';
+    debounce?.cancel();
+    debounce = Timer(const Duration(milliseconds: 350), () async {
+      try {
+        await persistDraft();
+      } catch (_) {
+        if (mounted) {
+          setState(
+            () => localMessage =
+                '기기 임시 저장에 실패했어요. 저장 공간을 확인하고 화면을 닫기 전에 다시 시도해 주세요.',
+          );
+        }
+      }
+    });
+  }
+
+  // Keep manual check state and item acknowledgements explicit; no SDK observation automatically checks these fields.
+  ManualChecks get currentChecks => ManualChecks(
+    windows: checked[EvidenceCategory.windows]!,
+    belongings: checked[EvidenceCategory.belongings]!,
+    exterior: checked[EvidenceCategory.exterior]!,
+    note: note.text,
+    collectedSpaces: collected.toList(),
+  );
+
+  // Recover a system-camera interruption explicitly, then commit the chosen category before promising that the photo can survive restart.
   Future<void> recoverPhoto() async {
     if (defaultTargetPlatform != TargetPlatform.android) return;
     final lost = await picker.retrieveLostData();
@@ -104,8 +234,10 @@ class _EvidenceScreenState extends State<EvidenceScreen> with ActionState {
     final bytes = await lost.files!.first.readAsBytes();
     validatePhoto(bytes);
     if (mounted) setState(() => drafts[category] = PhotoDraft(bytes));
+    await persistDraft();
   }
 
+  // Validate and durably retain the selected image before network work, with one stable request ID for every retry.
   Future<void> pick(EvidenceCategory category, ImageSource source) => run(
     () async {
       try {
@@ -120,12 +252,16 @@ class _EvidenceScreenState extends State<EvidenceScreen> with ActionState {
         final bytes = await file.readAsBytes();
         validatePhoto(bytes);
         if (mounted) setState(() => drafts[category] = PhotoDraft(bytes));
+        await persistDraft();
       } on PlatformException {
         throw const ApiException('사진을 열지 못했어요. 기기 설정에서 카메라·사진 접근 권한을 확인해 주세요.');
       }
     },
   );
+  // Upload the committed draft idempotently; retain it on a failed response and remove it only after the server acknowledges storage.
   Future<void> send(EvidenceCategory category) => run(() async {
+    await persistDraft();
+    if (!mounted) return;
     final draft = drafts[category]!;
     await RentalScope.of(
       context,
@@ -133,28 +269,35 @@ class _EvidenceScreenState extends State<EvidenceScreen> with ActionState {
     if (!mounted) return;
     setState(() => drafts.remove(category));
     await load();
+    await persistDraft();
     if (mounted) toast(context, '${category.label} 사진을 서버에 저장했어요.');
   });
+  // Keep user check marks locally first, and distinguish an offline draft from an acknowledged server checklist.
   Future<void> save() => run(() async {
-    await RentalScope.of(context).api.saveChecks(
-      token,
-      ManualChecks(
-        windows: checked[EvidenceCategory.windows]!,
-        belongings: checked[EvidenceCategory.belongings]!,
-        exterior: checked[EvidenceCategory.exterior]!,
-        note: note.text,
-      ),
-    );
+    await persistDraft();
+    if (offline) {
+      if (mounted) toast(context, '기기에 임시 저장했어요. 연결 후 서버에 전송해 주세요.');
+      return;
+    }
+    if (!mounted) return;
+    await RentalScope.of(context).api.saveChecks(token, currentChecks);
     if (!mounted) return;
     await load(syncChecks: true);
+    await persistDraft();
     if (mounted) toast(context, '직접 확인과 메모를 저장했어요.');
   });
+  // Preserve pending edits before obtaining a fresh owner-authorized photo link and reconciling a possibly changed inspection phase.
   Future<void> renew() => run(() async {
+    await persistDraft();
+    if (!mounted) return;
     final state = RentalScope.of(context);
     final record = await state.api.record(session!.record.id);
     final renewed = await state.beginEvidence(record);
     token = renewed;
-    if (mounted) await load();
+    if (mounted) {
+      await load();
+      await persistDraft();
+    }
   });
   Future<void> submit() async {
     // Confirm a complete return, recover a lost receipt response, and carry the record's test VIN warning into the result screen.
@@ -196,6 +339,15 @@ class _EvidenceScreenState extends State<EvidenceScreen> with ActionState {
           receipt['submittedAtMillis'] == null) {
         throw const ApiException('서버 접수 응답을 확인하지 못했어요. 내 기록에서 다시 확인해 주세요.');
       }
+      debounce?.cancel();
+      try {
+        await cache.remove(draftKey);
+      } catch (_) {
+        if (mounted) {
+          toast(context, '서버 접수는 완료됐어요. 기기 임시 자료 정리는 홈에서 다시 시도해 주세요.');
+        }
+      }
+      if (!mounted) return;
       state.refreshBookings().catchError((Object _) {});
       setState(() => leaving = true);
       Navigator.of(context).pushReplacement(
@@ -209,14 +361,24 @@ class _EvidenceScreenState extends State<EvidenceScreen> with ActionState {
     });
   }
 
+  // Await a committed draft before leaving the form so a quick back action does not discard the latest typed checks or note.
   Future<void> confirmLeave() async {
     if (busy) return;
+    try {
+      await persistDraft();
+    } catch (_) {
+      if (mounted) {
+        setState(() => error = "기기에 저장하지 못했어요. 저장 공간을 확인하고 다시 시도해 주세요.");
+      }
+      return;
+    }
+    if (!mounted) return;
     final yes = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('사진 화면에서 나갈까요?'),
         content: const Text(
-          '아직 전송하지 않은 사진과 저장하지 않은 확인 내역은 사라져요. 서버에 저장한 기록은 유지돼요.',
+          '사진과 확인 내역은 이 계정의 기기에 임시 보관했어요. 홈의 작성 중인 사진에서 이어갈 수 있어요. 임시 자료는 7일 뒤 만료돼요.',
         ),
         actions: [
           TextButton(
@@ -238,6 +400,7 @@ class _EvidenceScreenState extends State<EvidenceScreen> with ActionState {
     }
   }
 
+  // Present category-specific capture advice, server photos and an unsent preview while keeping manual review separate from uploads.
   Widget categoryPanel(EvidenceCategory category, bool enabled) {
     final photos = session!.photosFor(category), draft = drafts[category];
     return Panel(
@@ -257,6 +420,21 @@ class _EvidenceScreenState extends State<EvidenceScreen> with ActionState {
           ),
           const SizedBox(height: 6),
           Text(category.description),
+          PhotoGuidance(category),
+          if (session!.isReturn)
+            TextButton.icon(
+              onPressed: () => showPhotoComparison(
+                context,
+                category,
+                session!.pickupPhotos
+                    .where((p) => p.category == category)
+                    .toList(),
+                session!.photosFor(category),
+                drafts[category]?.bytes,
+              ),
+              icon: const Icon(Icons.compare_outlined),
+              label: const Text('인수·반납 사진 비교'),
+            ),
           const SizedBox(height: 16),
           Wrap(
             spacing: 10,
@@ -310,14 +488,18 @@ class _EvidenceScreenState extends State<EvidenceScreen> with ActionState {
             PrimaryAction(
               '이 사진 전송',
               busy: busy,
-              onPressed: enabled && photos.length < 5
+              onPressed:
+                  enabled && !offline && !session!.expired && photos.length < 5
                   ? () => send(category)
                   : null,
             ),
             TextButton(
               onPressed: busy
                   ? null
-                  : () => setState(() => drafts.remove(category)),
+                  : () => setState(() {
+                      drafts.remove(category);
+                      queueDraft();
+                    }),
               child: const Text('선택 취소'),
             ),
           ],
@@ -330,6 +512,7 @@ class _EvidenceScreenState extends State<EvidenceScreen> with ActionState {
                 ? (v) => setState(() {
                     checked[category] = v!;
                     dirty = true;
+                    queueDraft();
                   })
                 : null,
           ),
@@ -341,8 +524,9 @@ class _EvidenceScreenState extends State<EvidenceScreen> with ActionState {
   @override
   Widget build(BuildContext context) {
     // Keep evidence editing and submission tied to the current server phase while displaying any emulator VIN provenance.
-    final s = session, enabled = s != null && !s.expired && !busy;
-    final ready = s?.ready == true && !dirty && drafts.isEmpty && !busy;
+    final s = session, enabled = s != null && !busy;
+    final ready =
+        s?.ready == true && !dirty && drafts.isEmpty && !busy && !offline;
     return PopScope(
       canPop: leaving || (!busy && drafts.isEmpty && !dirty),
       onPopInvokedWithResult: (didPop, _) {
@@ -364,7 +548,44 @@ class _EvidenceScreenState extends State<EvidenceScreen> with ActionState {
             ),
           if (s != null) ...[
             if (s.record.isDemo) Notice(s.record.demoNotice),
-            if (s.isReturn) UsageMemoryNotice(s.record.usageMemory),
+            if (s.isReturn)
+              UsageMemoryNotice(
+                s.record.usageMemory,
+                collected: collected,
+                onCollected: enabled
+                    ? (space, value) => setState(() {
+                        if (value) {
+                          collected.add(space);
+                        } else {
+                          collected.remove(space);
+                        }
+                        dirty = true;
+                        queueDraft();
+                      })
+                    : null,
+              ),
+            if (s.isReturn) BatteryReturnNotice(s.record.batteryReturn),
+            if (restored)
+              const Notice('기기에 남겨 둔 사진·확인을 복원했어요. 전송 전 내용을 확인해 주세요.'),
+            if (localMessage != null) Notice(localMessage!),
+            if (offline)
+              const Notice(
+                '통신이 끊겨 기기 임시 자료를 보고 있어요. 연결을 복구해 다시 불러온 뒤 서버 전송·최종 제출을 진행해 주세요.',
+              ),
+            OutlinedButton.icon(
+              onPressed: busy
+                  ? null
+                  : () => run(() async {
+                      await persistDraft();
+                      await load();
+                    }),
+              icon: const Icon(Icons.sync),
+              label: const Text('전송 상태 다시 확인'),
+            ),
+            OutlinedButton(
+              onPressed: busy ? null : () => run(persistDraft),
+              child: const Text('기기 임시 저장'),
+            ),
             Notice(
               s.expired
                   ? '사진 전송 시간이 지났어요. 전송 연결을 갱신해 주세요.'
@@ -384,7 +605,10 @@ class _EvidenceScreenState extends State<EvidenceScreen> with ActionState {
               maxLines: 3,
               enabled: enabled,
               decoration: const InputDecoration(labelText: '추가 메모 (선택)'),
-              onChanged: (_) => setState(() => dirty = true),
+              onChanged: (_) => setState(() {
+                dirty = true;
+                queueDraft();
+              }),
             ),
             PrimaryAction(
               '직접 확인·메모 저장',

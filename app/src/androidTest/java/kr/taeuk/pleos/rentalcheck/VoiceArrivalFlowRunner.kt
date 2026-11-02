@@ -117,6 +117,11 @@ class VoiceArrivalFlowRunner : Instrumentation() {
                             else RentalCheckScreen(live.value, controller::dispatch)
                         } }
                     }
+                    "collect-trunk" -> send(InspectionEvent.CollectLuggage(StorageSpace.TRUNK, true))
+                    "charge-directions" -> send(InspectionEvent.RequestChargeDirections(checkNotNull(state().pairedBooking?.returnLocation?.chargingStops?.firstOrNull())))
+                    "show-parking" -> tapParking()
+                    "close-parking" -> tapScreen(1920f, 965f)
+
                     "open-memo" -> send(InspectionEvent.OpenVoiceMemo())
                     "listen" -> send(InspectionEvent.StartVoiceRecognition)
                     "edit-memo" -> send(InspectionEvent.EditVoiceMemo(StorageSpace.valueOf(command.getString("space")), command.getString("item")))
@@ -158,7 +163,10 @@ class VoiceArrivalFlowRunner : Instrumentation() {
             // Delegate cancellation unchanged so event tracing cannot alter the production adapter's session lifetime.
             override fun stop() = real.stop()
         }
-        return InspectionController(context, traced)
+        val navigation = kr.taeuk.pleos.rentalcheck.navigation.PleosReturnGuideEngine(context, recognitionScope) { message ->
+            targetContext.filesDir.resolve("$prefix-navigation.log").appendText(message + "\n")
+        }
+        return InspectionController(context, traced, navigation)
     }
 
     // Read the same main-thread state used by the composables to avoid racing Binder or cloud updates in assertions.
@@ -178,6 +186,24 @@ class VoiceArrivalFlowRunner : Instrumentation() {
 
     // Exercise exactly the guarded event handlers behind normal renter controls; no vehicle or location result is injected.
     private fun send(event: InspectionEvent) { idle(); runOnMainSync { controller.dispatch(event) }; idle() }
+
+    // Touch the parking-details control at coordinates reviewed in the actual fixed-size test AVD screenshot; never assign the dialog's remembered state.
+    private fun tapParking() {
+        waitForIdleSync(); Thread.sleep(150)
+        val picture = checkNotNull(uiAutomation.takeScreenshot())
+        check(picture.width == 2560 && picture.height >= 1400) { "Unreviewed test display dimensions" }; picture.recycle()
+        tapScreen(1325f, 606f)
+    }
+
+    // Exercise the actual fixed-display confirmation control without a global Back event that could close the surrounding AAOS task.
+    private fun tapScreen(x: Float, y: Float) {
+        val now = android.os.SystemClock.uptimeMillis()
+        for (action in listOf(android.view.MotionEvent.ACTION_DOWN, android.view.MotionEvent.ACTION_UP)) {
+            val event = android.view.MotionEvent.obtain(now, android.os.SystemClock.uptimeMillis(), action, x, y, 0)
+            event.source = android.view.InputDevice.SOURCE_TOUCHSCREEN
+            check(uiAutomation.injectInputEvent(event, true)); event.recycle()
+        }
+    }
 
     // Inspect the genuine accessibility text of rendered windows so a background controller or another DebugInspectionActivity cannot pass visual verification.
     private fun screenTexts(): String = buildString {
@@ -207,6 +233,10 @@ class VoiceArrivalFlowRunner : Instrumentation() {
             .put("navigationConfirmed", guide.navigation.confirmed).put("navigationMessage", guide.navigation.message)
             .put("errorMessage", current.errorMessage ?: JSONObject.NULL).put("gear", current.current?.find("gear.selection")?.value ?: JSONObject.NULL)
             .put("stationary", InspectionController::class.java.getDeclaredField("stationarySnapshot").apply { isAccessible = true }.get(controller)?.toString() ?: JSONObject.NULL)
+            .put("foreground", InspectionController::class.java.getDeclaredField("foreground").apply { isAccessible = true }.get(controller))
+            .put("batteryTarget", kr.taeuk.pleos.rentalcheck.model.BatteryReturn.from(current.record?.pickup, current.current).target ?: JSONObject.NULL)
+            .put("batteryCurrent", kr.taeuk.pleos.rentalcheck.model.BatteryReturn.from(current.record?.pickup, current.current).current ?: JSONObject.NULL)
+            .put("batteryShortfall", kr.taeuk.pleos.rentalcheck.model.BatteryReturn.from(current.record?.pickup, current.current).shortfall ?: JSONObject.NULL)
             .put("voicePhase", current.voiceMemo.phase.name).put("voiceProblem", current.voiceMemo.problem ?: JSONObject.NULL)
             .put("voiceTranscript", current.voiceMemo.draft.transcript).put("voiceItem", current.voiceMemo.draft.item)
             .put("voiceSpace", current.voiceMemo.draft.space?.name ?: JSONObject.NULL)

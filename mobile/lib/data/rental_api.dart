@@ -61,9 +61,9 @@ class RentalApi {
       req.body = jsonEncode(body);
     }
     try {
-      final response = await (() async =>
-              http.Response.fromStream(await _client.send(req)))()
-          .timeout(const Duration(seconds: 30));
+      final response = await (() async => http.Response.fromStream(
+        await _client.send(req),
+      ))().timeout(const Duration(seconds: 30));
       if (response.statusCode < 200 || response.statusCode >= 300) {
         String message = '요청을 처리하지 못했어요. 다시 시도해 주세요.';
         try {
@@ -219,10 +219,9 @@ class RentalApi {
     photoToken: token,
     body: {'revision': revision},
   );
-  Future<Uint8List> photo(String id) async =>
-      (await _send(
-        'GET',
-        '/api/account/photos/${Uri.encodeComponent(id)}',
-      )).bodyBytes;
+  Future<Uint8List> photo(String id) async => (await _send(
+    'GET',
+    '/api/account/photos/${Uri.encodeComponent(id)}',
+  )).bodyBytes;
   void close() => _client.close();
 }
