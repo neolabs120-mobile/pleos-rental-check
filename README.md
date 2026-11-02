@@ -16,14 +16,14 @@
 
 ## APK와 시연 영상
 
-현재 차량 앱과 Flutter 앱은 **0.4.2+17**입니다. [제출 자료 Release](https://github.com/neolabs120-mobile/pleos-rental-check/releases/tag/v0.2.6-submission)에서 APK와 소스를 받을 수 있습니다.
+현재 차량 앱과 Flutter 앱은 **0.4.3+18**입니다. [제출 자료 Release](https://github.com/neolabs120-mobile/pleos-rental-check/releases/tag/v0.2.6-submission)에서 APK와 소스를 받을 수 있습니다.
 
 | 파일 | 용도 |
 |---|---|
-| [차량용 APK](https://github.com/neolabs120-mobile/pleos-rental-check/releases/download/v0.2.6-submission/rentcheck_vehicle_0.4.2_release.apk) | Kotlin·Compose 앱. Android 9 이상과 Pleos Connect 환경이 필요합니다. |
-| [휴대폰용 APK](https://github.com/neolabs120-mobile/pleos-rental-check/releases/download/v0.2.6-submission/rentcheck_mobile_0.4.2_release.apk) | Flutter 앱. Android 7 이상에서 사용하며, 설정에 실행할 HTTPS 서버 주소를 입력합니다. |
-| [소스 코드 ZIP](https://github.com/neolabs120-mobile/pleos-rental-check/releases/download/v0.2.6-submission/rentcheck_source_0.4.2.zip) | 0.4.2 소스입니다. 저장소의 main에서도 확인할 수 있습니다. |
-| [파일 지문](https://github.com/neolabs120-mobile/pleos-rental-check/releases/download/v0.2.6-submission/SHA256SUMS_0.4.2.txt) | 내려받은 APK·소스·안내문의 SHA-256을 확인할 때 사용합니다. |
+| [차량용 APK](https://github.com/neolabs120-mobile/pleos-rental-check/releases/download/v0.2.6-submission/rentcheck_vehicle_0.4.3_release.apk) | Kotlin·Compose 앱. Android 9 이상과 Pleos Connect 환경이 필요합니다. |
+| [휴대폰용 APK](https://github.com/neolabs120-mobile/pleos-rental-check/releases/download/v0.2.6-submission/rentcheck_mobile_0.4.3_release.apk) | Flutter 앱. Android 7 이상에서 사용하며, 설정에 실행할 HTTPS 서버 주소를 입력합니다. |
+| [소스 코드 ZIP](https://github.com/neolabs120-mobile/pleos-rental-check/releases/download/v0.2.6-submission/rentcheck_source_0.4.3.zip) | 0.4.3 소스입니다. 저장소의 main에서도 확인할 수 있습니다. |
+| [파일 지문](https://github.com/neolabs120-mobile/pleos-rental-check/releases/download/v0.2.6-submission/SHA256SUMS_0.4.3.txt) | 내려받은 APK·소스·안내문의 SHA-256을 확인할 때 사용합니다. |
 
 두 APK는 기존 배포 키로 서명했습니다. Release 태그는 제출한 링크를 유지하기 위해 `v0.2.6-submission`을 사용합니다. GitHub가 자동으로 제공하는 **Source code ZIP은 당시 0.2.6 소스**이므로, 최신 버전은 위 ZIP이나 main을 이용해 주세요. 이전 APK와 영상도 같은 Release에 남겨두었습니다.
 
@@ -106,6 +106,12 @@ python server/issue_booking.py --base-url http://127.0.0.1:8788 --email 본인_�
 휴대폰 Release에는 별도로 준비한 HTTPS 서버가 필요합니다. 기본값 `https://rental.invalid`는 예시 주소이며, 공개 운영 서버를 제공하지 않습니다. 기존 Debug 앱과 Release 앱은 서명이 다르므로 데이터가 있는 Debug 앱을 지우며 교체하지 말고 분리된 기기나 시험 환경을 사용해 주세요.
 
 ## 검증 범위
+
+휴대폰 0.4.3+18은 가상 대여·반납 시나리오 시험에서 찾은 표시 문제를 고쳤습니다. 반납 전 주행 거리는 “반납 후 계산”으로, 전기차는 연료 대신 인수·반납 배터리를 보여 줍니다. 안내 문구를 카셰어링 업체 기준으로 맞추고, 합성 시연 데이터 접수는 제출 결과에도 표시합니다. 차량 앱은 버전만 맞췄습니다.
+
+Flutter 56개(선택 2개 제외)·분석 문제 0, Android Debug 108개·Release 106개·Lint 오류 0. 분리 시험 서버에서 가입부터 최종 접수까지 21단계 시나리오를 실제 Flutter 화면으로 진행해 통과했습니다.
+
+[대여·반납 시나리오 기록](docs/FLUTTER_SCENARIO_0.4.3.md)
 
 차량 0.4.2+17은 반납 전 **끄고 내리기 점검**을 추가했습니다. 반납을 시작·저장할 때 전조등·상향등·미등·실내등·독서등, 방향지시등, 와이퍼, 유리 열선, 핸들·사이드미러 열선을 Pleos Vehicle SDK로 새로 읽고, 켜져 있으면 창문 확인 다음에 화면과 Pleos 음성으로 알려 줍니다. 이용자는 끈 뒤 다시 확인하거나 켜진 채로 진행할 수 있으며, 앱은 차량을 조작하지 않습니다.
 

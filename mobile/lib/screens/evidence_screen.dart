@@ -355,6 +355,7 @@ class _EvidenceScreenState extends State<EvidenceScreen> with ActionState {
           builder: (_) => ReceiptScreen(
             receipt: receipt,
             usesTestVin: session!.record.usesTestVin,
+            isDemo: session!.record.isDemo,
           ),
         ),
       );
@@ -631,7 +632,7 @@ class _EvidenceScreenState extends State<EvidenceScreen> with ActionState {
               const Notice(
                 '인수 사진은 선택 사항이에요. 반납 점검은 차량 화면에서 반납 관측값을 저장한 뒤 진행해 주세요.',
               ),
-            const Notice('점검 기록 제출은 렌터카 업체의 실제 반납·요금 정산과 별도예요.'),
+            const Notice('점검 기록 제출은 카셰어링 업체의 실제 반납·요금 정산과 별도예요.'),
           ],
         ],
       ),

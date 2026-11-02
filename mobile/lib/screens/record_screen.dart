@@ -54,6 +54,32 @@ class _RecordScreenState extends State<RecordScreen> with ActionState {
       ],
     ),
   );
+  // Before the return is saved the distance cannot exist yet; say so instead of implying the vehicle failed to send it.
+  String distanceText(RentalRecord r) =>
+      r.returnAt == null ? '반납 후 계산' : amount(r.distanceKm, ' km');
+
+  // Electric vehicles report no fuel: show the saved pickup→return battery instead, keeping fuel for vehicles that report it.
+  Widget energyStat(RentalRecord r) {
+    final target = r.batteryReturn['targetPercent'] as num?;
+    final returned = r.batteryReturn['returnPercent'] as num?;
+    final pending = r.returnAt == null;
+    // Before the return only the pickup value exists, so show it alone under a label that says so.
+    if (r.pickupFuel == null && r.returnFuel == null && target != null) {
+      return pending
+          ? stat('배터리 · 인수 때', amount(target.toDouble(), '%'))
+          : stat(
+              '배터리',
+              '${amount(target.toDouble(), '%')} → ${amount(returned?.toDouble(), '%')}',
+            );
+    }
+    return pending
+        ? stat('연료 잔량 · 인수 때', amount(r.pickupFuel, '%'))
+        : stat(
+            '연료 잔량',
+            '${amount(r.pickupFuel, '%')} → ${amount(r.returnFuel, '%')}',
+          );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Show the owner's saved evidence with its VIN provenance so an emulator trial remains identifiable when reopened.
@@ -117,13 +143,8 @@ class _RecordScreenState extends State<RecordScreen> with ActionState {
                 Text('반납 ${dateLabel(r.returnAt)}'),
                 const Divider(height: 32),
                 Row(
-                  children: [
-                    stat('주행 거리', amount(r.distanceKm, ' km')),
-                    stat(
-                      '연료 잔량',
-                      '${amount(r.pickupFuel, '%')} → ${amount(r.returnFuel, '%')}',
-                    ),
-                  ],
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [stat('주행 거리', distanceText(r)), energyStat(r)],
                 ),
               ],
             ),
@@ -180,7 +201,7 @@ class _RecordScreenState extends State<RecordScreen> with ActionState {
                 ],
               ),
             ),
-          const Notice('점검 기록 접수는 렌터카 업체의 실제 반납 완료·요금 정산을 대신하지 않아요.'),
+          const Notice('점검 기록 접수는 카셰어링 업체의 실제 반납 완료·요금 정산을 대신하지 않아요.'),
         ],
       ],
     );

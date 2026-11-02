@@ -357,7 +357,7 @@ class _HomeScreenState extends State<HomeScreen> with ActionState {
               ],
             ),
           ),
-          const Notice('점검 접수는 렌터카 업체의 실제 반납 처리·요금 정산과 별도로 진행돼요.'),
+          const Notice('점검 접수는 카셰어링 업체의 실제 반납 처리·요금 정산과 별도로 진행돼요.'),
           if (error != null) Notice(error!, isError: true),
           PrimaryAction('로그아웃', busy: busy, onPressed: () => run(state.logout)),
         ],

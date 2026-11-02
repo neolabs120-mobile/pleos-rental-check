@@ -8,9 +8,12 @@ class ReceiptScreen extends StatelessWidget {
     super.key,
     required this.receipt,
     this.usesTestVin = false,
+    this.isDemo = false,
   });
   final Json receipt;
   final bool usesTestVin;
+  // Synthetic demo records must stay labelled on the receipt, not only while uploading.
+  final bool isDemo;
   @override
   // Keep emulator submissions visibly distinct from a real vehicle VIN observation after successful submission.
   Widget build(BuildContext context) => AppPage(
@@ -33,6 +36,7 @@ class ReceiptScreen extends StatelessWidget {
         ),
       ),
       const Intro('점검 기록을 제출했어요', '서버에 접수된 기록은 내 점검 기록에서 다시 확인할 수 있어요.'),
+      if (isDemo) const Notice('합성 시연 데이터로 진행한 시험 접수예요. 실제 차량 관측값이 아니에요.'),
       if (usesTestVin)
         const Notice('에뮬레이터 테스트 VIN으로 진행한 시험 접수예요. 실제 차량 VIN이 아니에요.'),
       Panel(
@@ -81,7 +85,7 @@ class ReceiptScreen extends StatelessWidget {
           ],
         ),
       ),
-      const Notice('렌터카 업체의 실제 반납 처리·추가 요금 정산은 별도로 진행돼요.'),
+      const Notice('카셰어링 업체의 실제 반납 처리·추가 요금 정산은 별도로 진행돼요.'),
       PrimaryAction(
         '내 대여로 돌아가기',
         onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
