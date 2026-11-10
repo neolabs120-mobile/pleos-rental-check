@@ -481,12 +481,12 @@ private fun CarSilhouette() {
     }
 }
 
-// Summarize the newest switch-off review on the return form; the row opens every raw light, wiper and heater reading.
+// Summarize the newest switch-off and door review on the return form; each row opens the raw readings behind it.
 @Composable
 private fun SwitchOffCard(snapshot: VehicleSnapshot?, open: (DetailGroup) -> Unit) {
     val check = SwitchOffCheck.from(snapshot)
     Panel {
-        PanelTitle("끄고 내리기", "조명 · 와이퍼 · 열선")
+        PanelTitle("끄고 내리기", "조명 · 와이퍼 · 열선 · 문")
         StatusRow(when {
             check.leftOn.isNotEmpty() -> "켜져 있는 항목 ${check.leftOn.size}개"
             check.offCount > 0 -> "조회한 ${check.offCount}개 항목 · 모두 꺼짐"
@@ -497,11 +497,24 @@ private fun SwitchOffCard(snapshot: VehicleSnapshot?, open: (DetailGroup) -> Uni
             check.offCount > 0 -> "마지막 조회 결과예요. 반납 점검 저장 시 다시 조회해요."
             else -> "조명·와이퍼·열선을 직접 확인해 주세요."
         }, attention = check.leftOn.isNotEmpty() || check.offCount == 0, onClick = { open(DetailGroup.SWITCH_OFF) })
+        val doorCount = check.leftOpen.size + check.closedCount
+        if (doorCount > 0 || check.unlocked.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            StatusRow(when {
+                check.leftOpen.isNotEmpty() -> "열려 있는 곳 ${check.leftOpen.size}곳"
+                doorCount > 0 -> "문 · 트렁크 등 ${doorCount}곳 모두 닫힘"
+                else -> "문 닫힘 상태를 확인하지 못했어요"
+            }, when {
+                check.leftOpen.isNotEmpty() -> check.leftOpen.joinToString { it.label } + " · 닫아 주세요."
+                check.unlocked.isNotEmpty() -> "문이 잠겨 있지 않아요. 내린 뒤 잠겼는지 확인해 주세요."
+                else -> "마지막 조회 결과예요. 반납 점검 저장 시 다시 조회해요."
+            }, attention = check.leftOpen.isNotEmpty() || doorCount == 0, onClick = { open(DetailGroup.DOORS) })
+        }
         if (check.leftOn.isNotEmpty() && check.unknown.isNotEmpty()) {
             Spacer(Modifier.height(8.dp)); Muted("확인하지 못한 항목: " + check.unknown.joinToString())
         }
         Spacer(Modifier.height(8.dp))
-        Muted("앱은 차량을 조작하지 않아요. 켜져 있으면 직접 꺼 주세요.")
+        Muted("앱은 차량을 조작하지 않아요. 켜져 있으면 직접 끄고, 열려 있으면 직접 닫아 주세요.")
     }
 }
 

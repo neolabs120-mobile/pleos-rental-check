@@ -9,7 +9,7 @@ import kr.taeuk.pleos.rentalcheck.vehicle.PleosVehicleDataSource
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** Read one real snapshot through the production data source and report only the switch-off readings; never touches stored rentals. */
+/** Read one real snapshot through the production data source and report only the switch-off and door readings; never touches stored rentals. */
 class SwitchOffProbeRunner : Instrumentation() {
     private var label = "probe"
 
@@ -27,14 +27,15 @@ class SwitchOffProbeRunner : Instrumentation() {
             val snapshot = runBlocking { source.readSnapshot() }
             val check = SwitchOffCheck.from(snapshot)
             val readings = JSONArray()
-            snapshot.readings.filter { it.key.startsWith(SwitchOffCheck.PREFIX) }.forEach {
+            snapshot.readings.filter { it.key.startsWith(SwitchOffCheck.PREFIX) || it.key.startsWith("door") }.forEach {
                 readings.put(JSONObject().put("key", it.key).put("label", it.label).put("status", it.status.name)
                     .put("value", it.value ?: JSONObject.NULL).put("display", it.displayValue).put("detail", it.detail))
             }
             val report = JSONObject().put("label", label).put("readings", readings)
-                .put("leftOn", JSONArray(check.leftOn.map { it.key })).put("unknown", JSONArray(check.unknown)).put("offCount", check.offCount)
+                .put("leftOn", JSONArray(check.leftOn.map { it.key })).put("leftOpen", JSONArray(check.leftOpen.map { it.key }))
+                .put("unlocked", JSONArray(check.unlocked)).put("closedCount", check.closedCount).put("unknown", JSONArray(check.unknown)).put("offCount", check.offCount)
             targetContext.filesDir.resolve("switchoff-probe-$label.json").writeText(report.toString(1))
-            result.putString("switchOffProbe", "leftOn=${check.leftOn.size} off=${check.offCount} unknown=${check.unknown.size}")
+            result.putString("switchOffProbe", "leftOn=${check.leftOn.size} off=${check.offCount} open=${check.leftOpen.size} closed=${check.closedCount} unlocked=${check.unlocked.size} unknown=${check.unknown.size}")
         } catch (error: Exception) { code = Activity.RESULT_CANCELED; result.putString("switchOffProbeError", error.stackTraceToString()) }
         finally { runCatching { source.close() } }
         finish(code, result)

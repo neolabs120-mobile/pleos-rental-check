@@ -265,7 +265,7 @@ class InspectionController(context: Context, recognitionEngine: LuggageRecogniti
                 publish()
             }
             InspectionEvent.ReplaySwitchOffSpeech -> state.returnSwitchOffDialog?.takeIf { foreground && state.stage == InspectionStage.RETURN }
-                ?.let { switchOffSpeech.play(SwitchOffCheck.spokenReminder(it.leftOn)) }
+                ?.let { switchOffSpeech.play(SwitchOffCheck.spokenReminder(it.leftOn, it.leftOpen)) }
             InspectionEvent.StopSwitchOffSpeech -> switchOffSpeech.stop()
             InspectionEvent.DismissReturnWindowCheck -> {
                 state = state.copy(returnWindowDialog = null)
@@ -366,11 +366,12 @@ class InspectionController(context: Context, recognitionEngine: LuggageRecogniti
                                 else "창문 상태를 확인하지 못했어요. 직접 닫힘을 확인해 주세요.")
                         if (action == CaptureAction.RETURN) return@launch
                     }
-                    // Windows keep priority; then remind about lights, signals, wipers and heaters still on, without blocking a confirmed choice.
+                    // Windows keep priority; then remind about anything still on and any door or trunk still open, without blocking a confirmed choice.
                     val switches = SwitchOffCheck.from(snapshot)
                     if (state.returnWindowDialog == null && switches.needsPrompt(state.switchOffAcknowledged)) {
                         state = state.copy(returnSwitchOffDialog = switches, retryReturnSave = action == CaptureAction.RETURN,
-                            message = "내리기 전에 켜져 있는 항목을 확인해 주세요.")
+                            message = if (switches.leftOpen.isEmpty()) "내리기 전에 켜져 있는 항목을 확인해 주세요."
+                                else "내리기 전에 열려 있거나 켜져 있는 항목을 확인해 주세요.")
                         if (action == CaptureAction.RETURN) return@launch
                     }
                 }
@@ -709,7 +710,7 @@ class InspectionController(context: Context, recognitionEngine: LuggageRecogniti
         if (switchOff != null && foreground && !disposing && !state.busy && state.stage == InspectionStage.RETURN &&
             switchOff.signature != spokenSwitchOff) {
             spokenSwitchOff = switchOff.signature
-            switchOffSpeech.play(SwitchOffCheck.spokenReminder(switchOff.leftOn))
+            switchOffSpeech.play(SwitchOffCheck.spokenReminder(switchOff.leftOn, switchOff.leftOpen))
         }
         returnSpeech.update(identity, state.returnOccupiedSeats, canSpeakReturnNotice(),
             if (state.returnMemoNotice) state.assistance.memory.luggageMemos else emptyList())

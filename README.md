@@ -9,21 +9,21 @@
 1. **차량 연결과 인수.** 예약한 이메일로 로그인하고 차량 QR을 확인한 뒤 연결을 승인합니다. 그다음 인수 상태를 저장합니다. 카메라를 쓸 수 없으면 QR에 담긴 링크를 직접 입력해도 됩니다.
 2. **짐 메모.** 차를 P에 두고 "트렁크에 캐리어를 뒀어"처럼 말하면 장소와 물건이 정리됩니다. 잘못 알아들었으면 고쳐서 저장하고, 말 대신 직접 입력할 수도 있습니다.
 3. **반납 장소로 이동.** 예약된 반납 장소를 확인하고 Pleos 내비로 길 안내를 받습니다. 운영자가 주차장 입구나 층, 구역 안내를 등록해 두었다면 함께 보여 줍니다. 배터리가 인수 때보다 많이 줄었으면 부족한 양과 등록된 충전 경유지를 알려 줍니다. 반납 장소 근처에 도착해 P에 두면 반납 준비를 하자고 제안합니다.
-4. **차에서 반납 점검.** 열린 창문부터 확인합니다. 이어서 전조등이나 실내등, 열선처럼 켜 둔 것이 있는지 보고, 짐 메모와 누가 앉아 있던 좌석을 화면과 음성으로 알려 줍니다. 챙긴 물건에 '챙겼어요'를 누르고 점검을 저장합니다.
-5. **휴대폰에서 마무리.** 창문과 소지품, 외관 사진을 찍고 직접 확인한 항목을 체크한 뒤 제출합니다. 차에서 다 확인하지 못한 물건은 여기서 이어서 확인할 수 있습니다. 사진 구도 안내와 인수 때 사진과의 비교를 볼 수 있고, 보내기 전 내용은 기기에 임시로 저장됩니다. 서버가 받으면 접수 번호가 나옵니다.
+4. **차에서 반납 점검.** 열린 창문부터 확인합니다. 이어서 전조등이나 실내등, 열선처럼 켜 둔 것과 열려 있는 문이나 트렁크가 있는지 보고, 짐 메모와 누가 앉아 있던 좌석을 화면과 음성으로 알려 줍니다. 챙긴 물건에 '챙겼어요'를 누르고 점검을 저장합니다.
+5. **휴대폰에서 마무리.** 창문과 소지품, 외관 사진을 찍고 직접 확인한 항목을 체크한 뒤 제출합니다. 차에서 다 확인하지 못한 물건은 여기서 이어서 확인할 수 있습니다. 사진 구도 안내와 인수 때 사진과의 비교를 볼 수 있고, 보내기 전 내용은 기기에 임시로 저장됩니다. 서버가 받으면 접수 번호와 함께 이용 시간, 주행 거리, 배터리 변화를 정리한 이용 요약이 나옵니다.
 
 좌석 신호만으로는 사람이 앉았는지 짐이 놓였는지 구분할 수 없습니다. 그래서 신호가 없는 좌석이나 메모하지 않은 곳도 직접 둘러보도록 안내합니다. 문이 열렸던 기록, 이용자가 직접 확인한 곳, 물건 메모는 서로 섞이지 않게 따로 저장합니다.
 
 ## APK와 시연 영상
 
-지금 배포 중인 버전은 차량 앱과 휴대폰 앱 모두 **0.4.3+18**입니다. APK와 소스는 [제출 자료 Release](https://github.com/neolabs120-mobile/pleos-rental-check/releases/tag/v0.2.6-submission)에서 받을 수 있습니다.
+지금 배포 중인 버전은 차량 앱과 휴대폰 앱 모두 **0.4.4+19**입니다. APK와 소스는 [제출 자료 Release](https://github.com/neolabs120-mobile/pleos-rental-check/releases/tag/v0.2.6-submission)에서 받을 수 있습니다.
 
 | 파일 | 설명 |
 |---|---|
-| [차량용 APK](https://github.com/neolabs120-mobile/pleos-rental-check/releases/download/v0.2.6-submission/rentcheck_vehicle_0.4.3_release.apk) | Kotlin과 Compose로 만든 차량 앱입니다. Android 9 이상, Pleos Connect 환경에서 동작합니다. |
-| [휴대폰용 APK](https://github.com/neolabs120-mobile/pleos-rental-check/releases/download/v0.2.6-submission/rentcheck_mobile_0.4.3_release.apk) | Flutter로 만든 휴대폰 앱입니다. Android 7 이상에서 쓰며, 설정에서 연결할 HTTPS 서버 주소를 입력합니다. |
-| [소스 코드 ZIP](https://github.com/neolabs120-mobile/pleos-rental-check/releases/download/v0.2.6-submission/rentcheck_source_0.4.3.zip) | 0.4.3 소스입니다. 저장소 main 브랜치와 같습니다. |
-| [파일 지문](https://github.com/neolabs120-mobile/pleos-rental-check/releases/download/v0.2.6-submission/SHA256SUMS_0.4.3.txt) | 받은 파일이 원본과 같은지 SHA-256으로 확인할 때 씁니다. |
+| [차량용 APK](https://github.com/neolabs120-mobile/pleos-rental-check/releases/download/v0.2.6-submission/rentcheck_vehicle_0.4.4_release.apk) | Kotlin과 Compose로 만든 차량 앱입니다. Android 9 이상, Pleos Connect 환경에서 동작합니다. |
+| [휴대폰용 APK](https://github.com/neolabs120-mobile/pleos-rental-check/releases/download/v0.2.6-submission/rentcheck_mobile_0.4.4_release.apk) | Flutter로 만든 휴대폰 앱입니다. Android 7 이상에서 쓰며, 설정에서 연결할 HTTPS 서버 주소를 입력합니다. |
+| [소스 코드 ZIP](https://github.com/neolabs120-mobile/pleos-rental-check/releases/download/v0.2.6-submission/rentcheck_source_0.4.4.zip) | 0.4.4 소스입니다. 저장소 main 브랜치와 같습니다. |
+| [파일 지문](https://github.com/neolabs120-mobile/pleos-rental-check/releases/download/v0.2.6-submission/SHA256SUMS_0.4.4.txt) | 받은 파일이 원본과 같은지 SHA-256으로 확인할 때 씁니다. |
 
 두 APK 모두 처음 제출할 때 쓴 배포 키로 서명했습니다. 제출한 링크가 바뀌지 않도록 Release 태그는 `v0.2.6-submission`을 계속 씁니다. 다만 GitHub가 자동으로 붙이는 **Source code ZIP은 0.2.6 시점의 소스**라서, 최신 코드는 위의 소스 ZIP이나 main에서 받아 주세요. 이전 APK와 0.2.6 영상도 같은 Release에 그대로 있습니다.
 
@@ -113,9 +113,10 @@ python server/issue_booking.py --base-url http://127.0.0.1:8788 --email 본인_�
 
 ## 검증한 것과 아직 못 한 것
 
-0.4.3 기준으로 Android 테스트는 Debug 108개와 Release 106개, 서버 테스트 51개, Flutter 테스트 56개(선택 실행 2개 제외)가 통과했습니다. Lint 오류와 Flutter 분석 문제는 없습니다.
+0.4.4 기준으로 Android 테스트는 Debug 112개와 Release 110개, 서버 테스트 51개, Flutter 테스트 60개(선택 실행 2개 제외)가 통과했습니다. Lint 오류와 Flutter 분석 문제는 없습니다.
 
 - **휴대폰 앱 전체 흐름.** 따로 띄운 시험 서버에 붙여 가입부터 최종 접수까지 21단계를 실제 Flutter 화면으로 진행했습니다. 여기서 찾은 표시 문제 세 가지(반납 전 주행거리, 전기차 연료 표시, 시연 데이터 안내)를 0.4.3에서 고쳤습니다. [시나리오 시험 기록](docs/FLUTTER_SCENARIO_0.4.3.md)
+- **문·트렁크 닫힘 확인.** 빈 Pleos 에뮬레이터에서 Virtual Console로 뒤 오른쪽 문과 트렁크를 열고 실제 SDK로 읽었더니 그 두 곳만 열림으로 잡혔고, 닫자 0곳으로 돌아왔습니다. 잠금 해제 안내와 휴대폰의 이용 요약 카드는 단위 테스트와 화면 예시로 확인했고, 실제 서버에 연결한 제출 흐름에서는 아직 보지 않았습니다. [0.4.4 기록](docs/DOORS_SUMMARY_0.4.4.md)
 - **끄고 내리기 점검.** 빈 Pleos 에뮬레이터에서 Virtual Console로 전조등, 실내등, 방향지시등, 와이퍼, 열선 등 신호 8가지를 켜고 실제 SDK로 읽었더니 12개 항목이 켜짐으로 잡혔고, 다시 끄자 0개로 돌아왔습니다. 앱은 상태를 읽기만 하고 차량을 조작하지 않습니다. 안개등은 이 에뮬레이터가 값을 주지 않아 '지원 안 함'으로 처리합니다. [끄고 내리기 기록](docs/SWITCH_OFF_0.4.2.md)
 - **반납 마무리.** 읽기 전용 Pleos 에뮬레이터에서 반납 통합 조건 11개를 확인했고, 웹에서 PNG, JPEG, WebP 사진 선택, 새로고침 후 복구, 직접 확인, 최종 접수까지 해 봤습니다. 시험 차량 배터리는 인수 80%에서 반납 72%로, 기준보다 8%p 부족하다고 안내했습니다. [반납 마무리 기록](docs/RETURN_COMPLETION_0.4.0.md)
 - **음성 메모와 도착 제안.** 0.3.0에서 실제 SDK로 13개 조건을 확인한 결과를 그대로 이어 씁니다. [0.3.0 기록](docs/VOICE_ARRIVAL_0.3.0.md)

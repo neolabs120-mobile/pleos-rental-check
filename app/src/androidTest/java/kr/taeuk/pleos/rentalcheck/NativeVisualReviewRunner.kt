@@ -64,7 +64,7 @@ class NativeVisualReviewRunner : Instrumentation() {
             val active = InspectionUiState(current = returned, record = stored.copy(returned = null, submittedAtMillis = null, receiptId = null),
                 stage = InspectionStage.ACTIVE, serverConfigured = true,
                 pairedBooking = PairedBooking("visual-only", "RC-UI-PREVIEW", "시연 이용자", VehicleIdentity.vin(stored.pickup).orEmpty(), place), returnGuide = guide)
-            val states = listOf("active-light", "return-voice", "return-form", "pickup", "account", "active-compact-large-font", "active-night", "location-unavailable", "active-long-destination", "result", "return-switch-off")
+            val states = listOf("active-light", "return-voice", "return-form", "pickup", "account", "active-compact-large-font", "active-night", "location-unavailable", "active-long-destination", "result", "return-switch-off", "return-doors-open", "return-doors-form")
             states.forEach { name ->
                 val drawn = CountDownLatch(1)
                 // A fresh factory AVD may open Navigation during provisioning; resume this isolated review Activity before waiting for its Compose frame.
@@ -92,6 +92,23 @@ class NativeVisualReviewRunner : Instrumentation() {
                                                     "return-form" -> RentalCheckScreen(active.copy(stage = InspectionStage.RETURN), {})
                                                     "return-switch-off" -> RentalCheckScreen(active.copy(stage = InspectionStage.RETURN,
                                                         returnSwitchOffDialog = kr.taeuk.pleos.rentalcheck.model.SwitchOffCheck.from(returned)), {})
+                                                    // Labelled display-only door fixture: trunk and one rear door open, passenger doors unlocked, lights already off.
+                                                    "return-doors-open", "return-doors-form" -> {
+                                                        val t = returned.completedAtMillis
+                                                        val doors = returned.copy(readings = returned.readings.filterNot {
+                                                            it.key.startsWith("door") || it.key.startsWith("switchOff.") } + listOf(
+                                                            VehicleReading("door.ROW_1_LEFT.closed", "앞쪽 왼쪽 문 닫힘 여부", ReadStatus.AVAILABLE, "true", "닫힘", null, "UI 예시", t),
+                                                            VehicleReading("door.ROW_1_RIGHT.closed", "앞쪽 오른쪽 문 닫힘 여부", ReadStatus.AVAILABLE, "true", "닫힘", null, "UI 예시", t),
+                                                            VehicleReading("door.ROW_2_LEFT.closed", "뒤쪽 왼쪽 문 닫힘 여부", ReadStatus.AVAILABLE, "true", "닫힘", null, "UI 예시", t),
+                                                            VehicleReading("door.ROW_2_RIGHT.closed", "뒤쪽 오른쪽 문 닫힘 여부", ReadStatus.AVAILABLE, "false", "열림", null, "UI 예시", t),
+                                                            VehicleReading("door.REAR.closed", "트렁크 문 닫힘 여부", ReadStatus.AVAILABLE, "false", "열림", null, "UI 예시", t),
+                                                            VehicleReading("door.HOOD.closed", "보닛 문 닫힘 여부", ReadStatus.AVAILABLE, "true", "닫힘", null, "UI 예시", t),
+                                                            VehicleReading("door.ROW_1_LEFT+ROW_1_RIGHT+ROW_2_LEFT+ROW_2_RIGHT.lock", "앞쪽 왼쪽 / 앞쪽 오른쪽 / 뒤쪽 왼쪽 / 뒤쪽 오른쪽 잠금", ReadStatus.AVAILABLE, "false", "잠금 해제", null, "UI 예시", t),
+                                                            VehicleReading("switchOff.light.lowBeam", "전조등", ReadStatus.AVAILABLE, "false", "꺼짐", null, "UI 예시", t),
+                                                            VehicleReading("switchOff.light.cabin", "실내등", ReadStatus.AVAILABLE, "false", "꺼짐", null, "UI 예시", t)))
+                                                        RentalCheckScreen(active.copy(current = doors, stage = InspectionStage.RETURN,
+                                                            returnSwitchOffDialog = if (name == "return-doors-open") kr.taeuk.pleos.rentalcheck.model.SwitchOffCheck.from(doors) else null), {})
+                                                    }
                                                     "result" -> RentalCheckScreen(active.copy(stage = InspectionStage.RESULT,
                                                         record = stored.copy(submittedAtMillis = now, receiptId = "UI-PREVIEW")), {})
                                                     "location-unavailable" -> RentalCheckScreen(active.copy(returnGuide = guide.copy(fix = null,
@@ -123,7 +140,7 @@ class NativeVisualReviewRunner : Instrumentation() {
                 folder.resolve("$name.png").outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
                 bitmap.recycle()
             }
-            result.putString("visualReview", "captured eleven labelled native layouts; no functional playback or navigation claim")
+            result.putString("visualReview", "captured thirteen labelled native layouts; no functional playback or navigation claim")
         } catch (error: Exception) { code = Activity.RESULT_CANCELED; result.putString("visualReviewError", error.stackTraceToString()) }
         finally { activity?.let { runOnMainSync { it.finish() } } }
         finish(code, result)

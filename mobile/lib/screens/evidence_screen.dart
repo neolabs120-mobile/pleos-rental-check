@@ -347,6 +347,13 @@ class _EvidenceScreenState extends State<EvidenceScreen> with ActionState {
           toast(context, '서버 접수는 완료됐어요. 기기 임시 자료 정리는 홈에서 다시 시도해 주세요.');
         }
       }
+      // The upload session carries no trip times or distance; read the saved record once for the summary and go on without it if that fails.
+      RentalRecord? summary;
+      try {
+        summary = await state.api
+            .record(session!.record.id)
+            .timeout(const Duration(seconds: 8));
+      } catch (_) {}
       if (!mounted) return;
       state.refreshBookings().catchError((Object _) {});
       setState(() => leaving = true);
@@ -356,6 +363,7 @@ class _EvidenceScreenState extends State<EvidenceScreen> with ActionState {
             receipt: receipt,
             usesTestVin: session!.record.usesTestVin,
             isDemo: session!.record.isDemo,
+            record: summary,
           ),
         ),
       );

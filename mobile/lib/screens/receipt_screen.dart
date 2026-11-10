@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/rental_models.dart';
 import '../ui/components.dart';
+import '../ui/trip_summary_card.dart';
 
 class ReceiptScreen extends StatelessWidget {
   // Carry the inspected record's test provenance into the final server receipt screen.
@@ -9,11 +10,14 @@ class ReceiptScreen extends StatelessWidget {
     required this.receipt,
     this.usesTestVin = false,
     this.isDemo = false,
+    this.record,
   });
   final Json receipt;
   final bool usesTestVin;
   // Synthetic demo records must stay labelled on the receipt, not only while uploading.
   final bool isDemo;
+  // The record this receipt closes; when present its saved pickup and return values become the trip summary.
+  final RentalRecord? record;
   @override
   // Keep emulator submissions visibly distinct from a real vehicle VIN observation after successful submission.
   Widget build(BuildContext context) => AppPage(
@@ -85,6 +89,7 @@ class ReceiptScreen extends StatelessWidget {
           ],
         ),
       ),
+      if (record != null && record!.returnAt != null) TripSummaryCard(record!),
       const Notice('카셰어링 업체의 실제 반납 처리·추가 요금 정산은 별도로 진행돼요.'),
       PrimaryAction(
         '내 대여로 돌아가기',
